@@ -22,7 +22,7 @@ Estabilishing a connection to HG from a class implementing EventSourceListener :
                     "thepassword"
             );
             
-            Control.connect(new Control.UpdateGroupsAndModulesCallback() {
+            Control.connect(new Control.UpdateGroupsAndModulesCallback() {  // <-- This is a very looong callback name, isn't it? =)
                 @Override
                 public void groupsAndModulesUpdated(boolean success) {
                     if (success) {
