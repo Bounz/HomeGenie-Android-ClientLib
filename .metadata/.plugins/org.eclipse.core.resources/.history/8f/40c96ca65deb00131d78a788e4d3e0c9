@@ -180,39 +180,31 @@ public class Control {
         Control.getGroupModules("", new Control.GetGroupModulesCallback() {
             @Override
             public void groupModulesUpdated(ArrayList<Module> modules) {
-            	if (modules == null)
-            	{
-            		// an error occurred
-            		callback.groupsAndModulesUpdated(false);
-            	}
-            	else
-            	{
-	                _modules = modules;
-	                // get groups list
-	                Control.getGroups(new Control.GetGroupsCallback() {
-	                    @Override
-	                    public void groupsUpdated(boolean success, ArrayList<Group> groups) {
-	                        if (success && groups.size() > 0) {
-	                            _groups = groups;
-	                            // link groups modules
-	                            for(Group g : _groups)
-	                            {
-	                                for(int m = 0; m < g.Modules.size(); m++)
-	                                {
-	                                    String domain = g.Modules.get(m).Domain;
-	                                    String address = g.Modules.get(m).Address;
-	                                    g.Modules.set(m, getModule(domain, address));
-	                                }
-	                            }
-	                            callback.groupsAndModulesUpdated(true);
-	                        }
-	                        else
-	                        {
-	                            callback.groupsAndModulesUpdated(false);
-	                        }
-	                    }
-	                });
-            	}
+                _modules = modules;
+                // get groups list
+                Control.getGroups(new Control.GetGroupsCallback() {
+                    @Override
+                    public void groupsUpdated(boolean success, ArrayList<Group> groups) {
+                        if (success && groups.size() > 0) {
+                            _groups = groups;
+                            // link groups modules
+                            for(Group g : _groups)
+                            {
+                                for(int m = 0; m < g.Modules.size(); m++)
+                                {
+                                    String domain = g.Modules.get(m).Domain;
+                                    String address = g.Modules.get(m).Address;
+                                    g.Modules.set(m, getModule(domain, address));
+                                }
+                            }
+                            callback.groupsAndModulesUpdated(true);
+                        }
+                        else
+                        {
+                            callback.groupsAndModulesUpdated(false);
+                        }
+                    }
+                });
             }
         });
     }
@@ -377,7 +369,6 @@ public class Control {
             } catch (Exception e) {
 //                Log.e("AsyncOperationFailed", e.getMessage());
                 e.printStackTrace();
-                if (callback != null) callback.groupModulesUpdated(null);
             }
 
             return "";
