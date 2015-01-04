@@ -412,11 +412,6 @@ public class Control {
                             param.UpdateTime = dateFormat.parse(jmp.getString("UpdateTime"));
                         } catch (Exception e) {
                         }
-                        param.LastValue = jmp.getString("LastValue");
-                        try {
-                            param.LastUpdateTime = dateFormat.parse(jmp.getString("LastUpdateTime"));
-                        } catch (Exception e) {
-                        }
                         module.Properties.add(param);
                     }
                     modlist.add(module);

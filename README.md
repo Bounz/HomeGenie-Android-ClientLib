@@ -2,7 +2,7 @@ HomeGenie-Android-ClientLib
 ===========================
 
 Android Client Library for HomeGenie Service
-
+This project is meant to be imported with Eclipse IDE.
 
 It enables a client application to connect a *HomeGenie* server.
 
