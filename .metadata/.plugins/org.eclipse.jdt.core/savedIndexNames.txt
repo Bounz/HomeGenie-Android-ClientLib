@@ -1,6 +1,0 @@
-INDEX VERSION 1.126+C:\Users\Gene\Documents\Progetti\Personali\HomeGenie-github\HomeGenie-Android-ClientLib\.metadata\.plugins\org.eclipse.jdt.core
-1375804739.index
-1561209848.index
-2571523656.index
-3758272881.index
-3543929332.index
