@@ -63,6 +63,10 @@ public class Control {
     private static String _hg_address;
     private static String _hg_user;
     private static String _hg_pass;
+    private static boolean _hg_ssl;
+    private static boolean _hg_acceptAll;
+
+    private static String _protocol = "http://";
 
     private static ArrayList<Module> _modules;
     private static ArrayList<Group> _groups;
@@ -81,10 +85,16 @@ public class Control {
         return request.body();
     }
 
-    public static void setServer(String ip, String user, String pass) {
+    public static void setServer(String ip, String user, String pass, boolean ssl, boolean acceptAll) {
         _hg_address = ip;
         _hg_user = user;
         _hg_pass = pass;
+        _hg_ssl = ssl;
+        _hg_acceptAll = acceptAll;
+        if (_hg_ssl)
+            _protocol = "https://";
+        else
+            _protocol = "http://";
     }
 
     public static void connect(final UpdateGroupsAndModulesCallback callback, EventSourceListener listener)
@@ -133,7 +143,7 @@ public class Control {
     }
 
     public static String getHgBaseHttpAddress() {
-        return "http://" + _hg_address + "/";
+        return _protocol + _hg_address + "/";
     }
 
     public static ArrayList<Module> getModules()
@@ -214,6 +224,10 @@ public class Control {
         HttpRequest request = HttpRequest.get(url);
         if (!_hg_user.equals("") && !_hg_pass.equals(""))
             request.basic(_hg_user, _hg_pass);
+        if (_hg_acceptAll && _hg_ssl) {
+            request.trustAllCerts();
+            request.trustAllHosts();
+        }
         return request;
     }
 
@@ -234,7 +248,7 @@ public class Control {
         private ServiceCallCallback callback;
 
         public ServiceCallRequest(String servicecall, ServiceCallCallback callback) {
-            this.serviceUrl = "http://" + _hg_address + "/api/" + servicecall;
+            this.serviceUrl = _protocol + _hg_address + "/api/" + servicecall;
             this.callback = callback;
         }
 
@@ -266,7 +280,7 @@ public class Control {
         private GetGroupsCallback callback;
 
         public GetGroupsRequest(GetGroupsCallback callback) {
-            this.serviceUrl = "http://" + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Groups.List/";
+            this.serviceUrl = _protocol + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Groups.List/";
             this.callback = callback;
         }
 
@@ -333,9 +347,9 @@ public class Control {
 
         public GetGroupModulesRequest(String groupName, GetGroupModulesCallback callback) {
             if (groupName.equals("")) {
-                this.serviceUrl = "http://" + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Modules.List/";
+                this.serviceUrl = _protocol + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Modules.List/";
             } else {
-                this.serviceUrl = "http://" + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Groups.ModulesList/" + Uri.encode(groupName);
+                this.serviceUrl = _protocol + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Groups.ModulesList/" + Uri.encode(groupName);
             }
             this.callback = callback;
         }
@@ -431,4 +445,3 @@ public class Control {
     }
 
 }
-
