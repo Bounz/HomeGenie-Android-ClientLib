@@ -32,7 +32,11 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.DelimiterBasedFrameDecoder;
 import io.netty.handler.codec.http.HttpRequestEncoder;
 import io.netty.handler.codec.string.StringDecoder;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.util.CharsetUtil;
+
 
 import java.net.URI;
 
@@ -74,6 +78,10 @@ public class EventSource {
                     @Override
                     public void initChannel(SocketChannel ch) throws Exception {
                         ChannelPipeline p = ch.pipeline();
+
+                        //final SslContext sslCtx;
+                        //sslCtx = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build();
+                        //p.addLast(sslCtx.newHandler(ch.alloc()));
 
                         //Lines must be separated by either a U+000D CARRIAGE RETURN U+000A LINE FEED (CRLF) character pair, 
                         //a single U+000A LINE FEED (LF) character, 

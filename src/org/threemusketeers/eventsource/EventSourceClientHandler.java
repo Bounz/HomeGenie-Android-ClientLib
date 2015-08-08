@@ -22,6 +22,7 @@
 package org.threemusketeers.eventsource;
 
 import android.util.Base64;
+import android.util.Log;
 
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
@@ -30,7 +31,7 @@ import java.net.URI;
 import java.util.concurrent.TimeUnit;
 
 @ChannelHandler.Sharable
-public class EventSourceClientHandler extends ChannelInboundMessageHandlerAdapter<Object> {
+public class EventSourceClientHandler extends SimpleChannelInboundHandler<Object> {
 
     URI uri;
     String authUser = "";
@@ -79,11 +80,15 @@ public class EventSourceClientHandler extends ChannelInboundMessageHandlerAdapte
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         channel = ctx.channel();
         FullHttpRequest request = getConnectHttpRequest();
-        channel.write(request);
+        channel.writeAndFlush(request);
     }
 
     @Override
-    public void messageReceived(ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void channelRead0(ChannelHandlerContext ctx, Object msg) throws Exception {
+    }
+
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         String content = (String)msg;
         // First have the hand shake done
         if (!handshaker.isHandshakeComplete()) {
