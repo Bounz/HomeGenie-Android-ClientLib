@@ -22,13 +22,11 @@
 package org.threemusketeers.eventsource;
 
 import android.util.Base64;
-import android.util.Log;
-
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
-
 import java.net.URI;
 import java.util.concurrent.TimeUnit;
+
 
 @ChannelHandler.Sharable
 public class EventSourceClientHandler extends SimpleChannelInboundHandler<Object> {
@@ -61,7 +59,7 @@ public class EventSourceClientHandler extends SimpleChannelInboundHandler<Object
             notification.onError("RECONNECTING");
             final EventLoop loop = ctx.channel().eventLoop();
 
-            // Wait a delay equal to the reconnection time of the event source.            
+            // Wait a delay equal to the reconnection time of the event source.
             loop.schedule(new Runnable() {
                 @Override
                 public void run() {

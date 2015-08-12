@@ -142,6 +142,16 @@ public class Control {
         return _hg_pass;
     }
 
+    public static boolean getSSL()
+    {
+        return _hg_ssl;
+    }
+
+    public static boolean getAcceptAll()
+    {
+        return _hg_acceptAll;
+    }
+
     public static String getHgBaseHttpAddress() {
         return _protocol + _hg_address + "/";
     }
