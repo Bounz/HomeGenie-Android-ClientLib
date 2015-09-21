@@ -23,7 +23,6 @@ package com.glabs.homegenie.client;
 
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.util.Base64;
 
 import com.glabs.homegenie.client.data.Event;
 import com.glabs.homegenie.client.data.Group;
@@ -31,23 +30,14 @@ import com.glabs.homegenie.client.data.Module;
 import com.glabs.homegenie.client.data.ModuleParameter;
 import com.glabs.homegenie.client.eventsource.EventSourceListener;
 import com.glabs.homegenie.client.eventsource.EventSourceTask;
+import com.glabs.homegenie.client.httprequest.HttpRequest;
+import com.glabs.homegenie.client.httprequest.HttpRequest.HttpRequestException;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.StatusLine;
 import org.apache.http.client.HttpResponseException;
-import org.apache.http.client.ResponseHandler;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.HttpConnectionParams;
-import org.apache.http.params.HttpParams;
-import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.TimeZone;
@@ -73,6 +63,10 @@ public class Control {
     private static String _hg_address;
     private static String _hg_user;
     private static String _hg_pass;
+    private static boolean _hg_ssl;
+    private static boolean _hg_acceptAll;
+
+    private static String _protocol = "http://";
 
     private static ArrayList<Module> _modules;
     private static ArrayList<Group> _groups;
@@ -80,24 +74,27 @@ public class Control {
     private static EventSourceListener _listener;
     private static EventSourceTask _sseTask;
 
-    private static final ResponseHandler<String> _response_handler = new ResponseHandler<String>() {
-        public String handleResponse(final HttpResponse response)
-                throws HttpResponseException, IOException {
-            StatusLine statusLine = response.getStatusLine();
-            if (statusLine.getStatusCode() >= 300) {
-                throw new HttpResponseException(statusLine.getStatusCode(),
-                        statusLine.getReasonPhrase());
+    private static String handleResponse(HttpRequest request) {
+        if (request.code() < 200 || request.code() >= 300) {
+            try {
+                throw new HttpResponseException(request.code(), request.message());
+            } catch (HttpResponseException e) {
+                e.printStackTrace();
             }
-
-            HttpEntity entity = response.getEntity();
-            return entity == null ? null : EntityUtils.toString(entity, "UTF-8");
         }
-    };
+        return request.body();
+    }
 
-    public static void setServer(String ip, String user, String pass) {
+    public static void setServer(String ip, String user, String pass, boolean ssl, boolean acceptAll) {
         _hg_address = ip;
         _hg_user = user;
         _hg_pass = pass;
+        _hg_ssl = ssl;
+        _hg_acceptAll = acceptAll;
+        if (_hg_ssl)
+            _protocol = "https://";
+        else
+            _protocol = "http://";
     }
 
     public static void connect(final UpdateGroupsAndModulesCallback callback, EventSourceListener listener)
@@ -145,8 +142,18 @@ public class Control {
         return _hg_pass;
     }
 
+    public static boolean getSSL()
+    {
+        return _hg_ssl;
+    }
+
+    public static boolean getAcceptAll()
+    {
+        return _hg_acceptAll;
+    }
+
     public static String getHgBaseHttpAddress() {
-        return "http://" + _hg_address + "/";
+        return _protocol + _hg_address + "/";
     }
 
     public static ArrayList<Module> getModules()
@@ -180,39 +187,32 @@ public class Control {
         Control.getGroupModules("", new Control.GetGroupModulesCallback() {
             @Override
             public void groupModulesUpdated(ArrayList<Module> modules) {
-            	if (modules == null)
-            	{
-            		// an error occurred
-            		callback.groupsAndModulesUpdated(false);
-            	}
-            	else
-            	{
-	                _modules = modules;
-	                // get groups list
-	                Control.getGroups(new Control.GetGroupsCallback() {
-	                    @Override
-	                    public void groupsUpdated(boolean success, ArrayList<Group> groups) {
-	                        if (success && groups.size() > 0) {
-	                            _groups = groups;
-	                            // link groups modules
-	                            for(Group g : _groups)
-	                            {
-	                                for(int m = 0; m < g.Modules.size(); m++)
-	                                {
-	                                    String domain = g.Modules.get(m).Domain;
-	                                    String address = g.Modules.get(m).Address;
-	                                    g.Modules.set(m, getModule(domain, address));
-	                                }
-	                            }
-	                            callback.groupsAndModulesUpdated(true);
-	                        }
-	                        else
-	                        {
-	                            callback.groupsAndModulesUpdated(false);
-	                        }
-	                    }
-	                });
-            	}
+                if (modules == null) {
+                    // an error occurred
+                    callback.groupsAndModulesUpdated(false);
+                } else {
+                    _modules = modules;
+                    // get groups list
+                    Control.getGroups(new Control.GetGroupsCallback() {
+                        @Override
+                        public void groupsUpdated(boolean success, ArrayList<Group> groups) {
+                            if (success && groups.size() > 0) {
+                                _groups = groups;
+                                // link groups modules
+                                for (Group g : _groups) {
+                                    for (int m = 0; m < g.Modules.size(); m++) {
+                                        String domain = g.Modules.get(m).Domain;
+                                        String address = g.Modules.get(m).Address;
+                                        g.Modules.set(m, getModule(domain, address));
+                                    }
+                                }
+                                callback.groupsAndModulesUpdated(true);
+                            } else {
+                                callback.groupsAndModulesUpdated(false);
+                            }
+                        }
+                    });
+                }
             }
         });
     }
@@ -230,13 +230,15 @@ public class Control {
         new ServiceCallRequest(servicecall, callback).execute();
     }
 
-    public static HttpGet getHttpGetRequest(String url) {
-        HttpGet getRequest = new HttpGet(url);
-        //getRequest.setHeader("Accept", "text/json");
-        if (!_hg_user.equals("") && !_hg_pass.equals("")) {
-            getRequest.addHeader("Authorization", "Basic " + Base64.encodeToString((_hg_user + ":" + _hg_pass).getBytes(), Base64.NO_WRAP));
+    public static HttpRequest getHttpGetRequest(String url) {
+        HttpRequest request = HttpRequest.get(url);
+        if (!_hg_user.equals("") && !_hg_pass.equals(""))
+            request.basic(_hg_user, _hg_pass);
+        if (_hg_acceptAll && _hg_ssl) {
+            request.trustAllCerts();
+            request.trustAllHosts();
         }
-        return getRequest;
+        return request;
     }
 
     public static String getUpnpDisplayName(Module m) {
@@ -256,7 +258,7 @@ public class Control {
         private ServiceCallCallback callback;
 
         public ServiceCallRequest(String servicecall, ServiceCallCallback callback) {
-            this.serviceUrl = "http://" + _hg_address + "/api/" + servicecall;
+            this.serviceUrl = _protocol + _hg_address + "/api/" + servicecall;
             this.callback = callback;
         }
 
@@ -264,10 +266,9 @@ public class Control {
         protected String doInBackground(String... params) {
             //execute the post
             try {
-                DefaultHttpClient client = new DefaultHttpClient();
-                HttpGet getRequest = getHttpGetRequest(serviceUrl);
-                return client.execute(getRequest, _response_handler);
-            } catch (Exception e) {
+                HttpRequest request = getHttpGetRequest(serviceUrl);
+                return handleResponse(request);
+            } catch (HttpRequestException e) {
                 //Log.e("AsyncOperationFailed", e.getMessage());
                 e.printStackTrace();
             }
@@ -289,7 +290,7 @@ public class Control {
         private GetGroupsCallback callback;
 
         public GetGroupsRequest(GetGroupsCallback callback) {
-            this.serviceUrl = "http://" + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Groups.List/";
+            this.serviceUrl = _protocol + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Groups.List/";
             this.callback = callback;
         }
 
@@ -297,21 +298,17 @@ public class Control {
         protected String doInBackground(String... params) {
             //execute the post
             try {
-                DefaultHttpClient client = new DefaultHttpClient();
-                HttpParams httpParameters = new BasicHttpParams();
+                HttpRequest request = getHttpGetRequest(serviceUrl);
                 // Set the timeout in milliseconds until a connection is established.
                 // The default value is zero, that means the timeout is not used.
                 int timeoutConnection = 10000;
-                HttpConnectionParams.setConnectionTimeout(httpParameters, timeoutConnection);
+                request.connectTimeout(timeoutConnection);
                 // Set the default socket timeout (SO_TIMEOUT)
                 // in milliseconds which is the timeout for waiting for data.
                 int timeoutSocket = 10000;
-                HttpConnectionParams.setSoTimeout(httpParameters, timeoutSocket);        //getRequest.setHeader("Content-type", "text/json");
-                client.setParams(httpParameters);
-                //
-                HttpGet getRequest = getHttpGetRequest(serviceUrl);
-                return client.execute(getRequest, _response_handler);
-            } catch (Exception e) {
+                request.readTimeout(timeoutSocket);
+                return handleResponse(request);
+            } catch (HttpRequestException e) {
                 if (callback != null) callback.groupsUpdated(false, new ArrayList<Group>());
 //                Log.e("AsyncOperationFailed", e.getMessage());
                 e.printStackTrace();
@@ -360,9 +357,9 @@ public class Control {
 
         public GetGroupModulesRequest(String groupName, GetGroupModulesCallback callback) {
             if (groupName.equals("")) {
-                this.serviceUrl = "http://" + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Modules.List/";
+                this.serviceUrl = _protocol + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Modules.List/";
             } else {
-                this.serviceUrl = "http://" + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Groups.ModulesList/" + Uri.encode(groupName);
+                this.serviceUrl = _protocol + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Groups.ModulesList/" + Uri.encode(groupName);
             }
             this.callback = callback;
         }
@@ -371,10 +368,9 @@ public class Control {
         protected String doInBackground(String... params) {
             //execute the post
             try {
-                DefaultHttpClient client = new DefaultHttpClient();
-                HttpGet getRequest = getHttpGetRequest(serviceUrl);
-                return client.execute(getRequest, _response_handler);
-            } catch (Exception e) {
+                HttpRequest request = getHttpGetRequest(serviceUrl);
+                return handleResponse(request);
+            } catch (HttpRequestException e) {
 //                Log.e("AsyncOperationFailed", e.getMessage());
                 e.printStackTrace();
                 if (callback != null) callback.groupModulesUpdated(null);
@@ -459,4 +455,3 @@ public class Control {
     }
 
 }
-

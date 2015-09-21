@@ -35,7 +35,7 @@ public class EventSourceHandshaker {
     boolean complete = false;
 
     public boolean continueHandshake(String content) {
-        Log.i("EventSource.Http", content);
+        //Log.i("EventSource.Http", content);
         if (!Constants.EMPTY_LINE.equals(content)) {
             if(!handshakeStarted) {
                 // Find the http status OK

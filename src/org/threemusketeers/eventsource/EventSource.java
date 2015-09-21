@@ -21,6 +21,8 @@
  */
 package org.threemusketeers.eventsource;
 
+import com.glabs.homegenie.client.Control;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -32,9 +34,18 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.DelimiterBasedFrameDecoder;
 import io.netty.handler.codec.http.HttpRequestEncoder;
 import io.netty.handler.codec.string.StringDecoder;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.util.CharsetUtil;
 
 import java.net.URI;
+import java.security.KeyStore;
+import java.security.cert.X509Certificate;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 
 /**
  * Implementation of the EventSource java client compliant with
@@ -66,6 +77,26 @@ public class EventSource {
         }
     }
 
+    /**
+     * Bogus trust manager accepting any certificate
+     */
+    private static class BogusTrustManager implements X509TrustManager {
+        @Override
+        public void checkClientTrusted(X509Certificate[] certs, String s) {
+            // nothing
+        }
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] certs, String s) {
+            // nothing
+        }
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
+        }
+    }
+
     void createBootstrap() {
         bootstrap = new Bootstrap();
         bootstrap.group(group)
@@ -74,6 +105,22 @@ public class EventSource {
                     @Override
                     public void initChannel(SocketChannel ch) throws Exception {
                         ChannelPipeline p = ch.pipeline();
+
+                        if (Control.getSSL()) {
+                            SSLContext sslContext = SSLContext.getInstance("TLS");
+                            if (Control.getAcceptAll()) {
+                                sslContext.init(null, new TrustManager[]{new BogusTrustManager()}, null);
+                            } else {
+                                TrustManagerFactory tmFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                                KeyStore tmpKS = null;
+                                tmFactory.init(tmpKS);
+                                TrustManager[] tm = tmFactory.getTrustManagers();
+                                sslContext.init(null, tm, null);
+                            }
+                            SSLEngine sslEngine = sslContext.createSSLEngine();
+                            sslEngine.setUseClientMode(true);
+                            p.addFirst("ssl", new SslHandler(sslEngine));
+                        }
 
                         //Lines must be separated by either a U+000D CARRIAGE RETURN U+000A LINE FEED (CRLF) character pair, 
                         //a single U+000A LINE FEED (LF) character, 
