@@ -122,7 +122,7 @@ public class Control {
             			for (ModuleParameter p : m.Properties) {
             				cm.setParameter(p.Name, p.Value, p.UpdateTime); 
             			}
-            		} else {
+            		} else if (_modules != null) {
             			_modules.add(m);
             		}
             	}
