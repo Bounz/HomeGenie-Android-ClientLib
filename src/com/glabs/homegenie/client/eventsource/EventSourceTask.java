@@ -79,7 +79,7 @@ public class EventSourceTask extends AsyncTask<String, Void, Void> implements Ev
 
     @Override
     public void onMessage(Message message) {
-        Log.i("EventSource.Message", message.data);
+        Log.d("EventSource.Message", message.data);
         //
         try {
             JSONObject jevent = new JSONObject(message.data);

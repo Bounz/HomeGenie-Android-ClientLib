@@ -97,8 +97,7 @@ public class Control {
             _protocol = "http://";
     }
 
-    public static void connect(final UpdateGroupsAndModulesCallback callback, EventSourceListener listener)
-    {
+    public static void connect(final UpdateGroupsAndModulesCallback callback, EventSourceListener listener) {
         disconnect();
         _listener = listener;
         updateGroupAndModules(new UpdateGroupsAndModulesCallback() {
@@ -110,45 +109,68 @@ public class Control {
         _sseTask = new EventSourceTask();
         _sseTask.execute(getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/");
     }
+    
+    public static void resume(final GetGroupModulesCallback callback) {
+        Control.getGroupModules("", new Control.GetGroupModulesCallback() {
+            @Override
+            public void groupModulesUpdated(ArrayList<Module> modules) {
+                // update modules
+            	for(Module m : modules) {
+            		Module cm = getModule(m.Domain, m.Address);
+            		if (cm != null) {
+            			cm.Name = m.Name;
+            			for (ModuleParameter p : m.Properties) {
+            				cm.setParameter(p.Name, p.Value, p.UpdateTime); 
+            			}
+            		} else {
+            			_modules.add(m);
+            		}
+            	}
+                callback.groupModulesUpdated(modules);
+            }
+        });
+        _sseTask = new EventSourceTask();
+        _sseTask.execute(getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/");
+    }
 
-    public static void disconnect()
-    {
+    public static void pause() {
+        if (_sseTask != null) {
+            _sseTask.stop();
+            //_sseTask.cancel(true);
+            _sseTask = null;
+        }    	
+    }
+    
+    public static void disconnect() {
         _listener = null;
-        if (_sseTask != null)
-        {
+        if (_sseTask != null) {
             _sseTask.stop();
             //_sseTask.cancel(true);
             _sseTask = null;
         }
-        if (_groups != null)
-        {
+        if (_groups != null) {
             _groups.clear();
             _groups = null;
         }
-        if (_modules != null)
-        {
+        if (_modules != null) {
             _modules.clear();
             _modules = null;
         }
     }
 
-    public static String getAuthUser()
-    {
+    public static String getAuthUser() {
         return _hg_user;
     }
 
-    public static String getAuthPassword()
-    {
+    public static String getAuthPassword() {
         return _hg_pass;
     }
 
-    public static boolean getSSL()
-    {
+    public static boolean getSSL() {
         return _hg_ssl;
     }
 
-    public static boolean getAcceptAll()
-    {
+    public static boolean getAcceptAll() {
         return _hg_acceptAll;
     }
 
@@ -156,33 +178,27 @@ public class Control {
         return _protocol + _hg_address + "/";
     }
 
-    public static ArrayList<Module> getModules()
-    {
+    public static ArrayList<Module> getModules() {
         return _modules;
     }
 
-    public static ArrayList<Group> getGroups()
-    {
+    public static ArrayList<Group> getGroups() {
         return _groups;
     }
 
-    public static Module getModule(String domain, String address)
-    {
+    public static Module getModule(String domain, String address) {
         Module module = null;
         if (_modules != null)
-        for(Module m : _modules)
-        {
-            if (m.Domain.equals(domain) && m.Address.equals(address))
-            {
+        for(Module m : _modules) {
+            if (m.Domain.equals(domain) && m.Address.equals(address)) {
                 module = m;
                 break;
             }
         }
         return module;
     }
-
-    public static void updateGroupAndModules(final UpdateGroupsAndModulesCallback callback)
-    {
+    
+    public static void updateGroupAndModules(final UpdateGroupsAndModulesCallback callback) {
         // get complete list of modules
         Control.getGroupModules("", new Control.GetGroupModulesCallback() {
             @Override
@@ -427,8 +443,7 @@ public class Control {
     // Server Sent Events Handling
     //
     public static void onSseConnect() {
-        if (_listener != null)
-        {
+        if (_listener != null) {
             _listener.onSseConnect();
         }
     }
@@ -436,20 +451,17 @@ public class Control {
     public static void onSseEvent(Event event) {
 
         Module module = getModule(event.Domain, event.Source);
-        if (module != null)
-        {
+        if (module != null) {
             module.setParameter(event.Property, event.Value, event.Timestamp);
         }
 
-        if (_listener != null)
-        {
-            _listener.onSseEvent(event);
+        if (_listener != null) {
+            _listener.onSseEvent(module, event);
         }
     }
 
     public static void onSseError(String error) {
-        if (_listener != null)
-        {
+        if (_listener != null) {
             _listener.onSseError(error);
         }
     }

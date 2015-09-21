@@ -22,12 +22,13 @@
 package com.glabs.homegenie.client.eventsource;
 
 import com.glabs.homegenie.client.data.Event;
+import com.glabs.homegenie.client.data.Module;
 
 /**
  * Created by Gene on 29/04/14.
  */
 public interface EventSourceListener {
     void onSseConnect();
-    void onSseEvent(Event event);
+    void onSseEvent(Module module, Event event);
     void onSseError(String error);
 }
