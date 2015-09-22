@@ -115,6 +115,7 @@ public class Control {
             @Override
             public void groupModulesUpdated(ArrayList<Module> modules) {
                 // update modules
+            	if (modules != null)
             	for(Module m : modules) {
             		Module cm = getModule(m.Domain, m.Address);
             		if (cm != null) {
