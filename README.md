@@ -5,19 +5,19 @@ Android Client Library for [HomeGenie](https://github.com/genielabs/HomeGenie).
 
 ### Usage
 
-To edit/build this library, open it in Android Studio. For building the library *jar* file, use the ```gradlew``` command from termial:
+To edit/build the library, open it in Android Studio. For building the library *jar* file, use the ```gradlew``` command from terminal:
 
 ```bash
-gradlew makeJar
+./gradlew makeJar
 ```
 
-the jar library will be generate in the ```homegenieclientlib\build\outputs``` folder.
+the jar file will be generated in the ```homegenieclientlib\build\outputs``` folder.
 
-After adding the ```homegenieclientlib`` dependency to your project, your applications will be able to connect *HomeGenie* server as shown in the example below.
+After adding the ```homegenieclientlib`` as a dependency to your project, your application will be able to connect to *HomeGenie* as shown in the example below.
 
-After the connection is estabilished the client can access to *Groups and Modules* data structures that are real-time updated via *Server Sent Events* (http://en.wikipedia.org/wiki/Server-sent_events).
+After the connection is estabilished the client application can access to *Groups and Modules* data structures, that are real-time updated through a [SSE stream](http://en.wikipedia.org/wiki/Server-sent_events).
 
-For receiving real-time events from HG server a class implementing **EventSourceListener** interface must be provided as the second parameter of the **Control.connect** method.
+In order to receive **SSE** events a class implementing **EventSourceListener** interface must be provided as the second parameter of the **Control.connect** method.
 
 ###Examples
 
