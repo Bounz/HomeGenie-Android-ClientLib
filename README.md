@@ -1,11 +1,19 @@
 HomeGenie-Android-ClientLib
 ===========================
 
-Android Client Library for HomeGenie Service.
+Android Client Library for [HomeGenie](https://github.com/genielabs/HomeGenie).
 
-This project is meant to be imported with Eclipse IDE.
+### Usage
 
-It enables a client application to connect a *HomeGenie* server.
+To edit/build this library, open it in Android Studio. For building the library *jar* file, use the ```gradlew``` command from termial:
+
+```bash
+gradlew makeJar
+```
+
+the jar library will be generate in the ```homegenieclientlib\build\outputs``` folder.
+
+After adding the ```homegenieclientlib`` dependency to your project, your applications will be able to connect *HomeGenie* server as shown in the example below.
 
 After the connection is estabilished the client can access to *Groups and Modules* data structures that are real-time updated via *Server Sent Events* (http://en.wikipedia.org/wiki/Server-sent_events).
 
@@ -95,7 +103,7 @@ Accessing Groups and Modules data structures:
 
 For further informations about data fields and methods see:
 
-https://github.com/genielabs/HomeGenie-Android-ClientLib/tree/master/src/com/glabs/homegenie/client/data
+https://github.com/genielabs/HomeGenie-Android-ClientLib/tree/master/homegenieclientlib/src/main/java/com/glabs/homegenie/client/data
 
 For a working example app using this library see:
 
