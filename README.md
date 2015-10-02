@@ -1,7 +1,7 @@
 HomeGenie-Android-ClientLib
 ===========================
 
-Android Client Library for [HomeGenie](https://github.com/genielabs/HomeGenie).
+Java/Android Client Library for [HomeGenie](https://github.com/genielabs/HomeGenie).
 
 ### Usage
 
@@ -13,11 +13,14 @@ To edit/build the library, open it in Android Studio. For building the library *
 
 the jar file will be generated in the ```homegenieclientlib\build\outputs``` folder.
 
-After adding the ```homegenieclientlib`` as a dependency to your project, your application will be able to connect to *HomeGenie* as shown in the example below.
+After adding the ```homegenieclientlib``` as a dependency to your project, your application will be able to connect to *HomeGenie* as shown in the example below.
 
 After the connection is estabilished the client application can access to *Groups and Modules* data structures, that are real-time updated through a [SSE stream](http://en.wikipedia.org/wiki/Server-sent_events).
 
-In order to receive **SSE** events a class implementing **EventSourceListener** interface must be provided as the second parameter of the **Control.connect** method.
+In order to receive **SSE** events a class implementing ```EventSourceListener``` interface must be provided as the second parameter of the ```Control.connect``` method.
+
+The ```com.glabs.homegenie.client.data.Module``` object extends ```Observable```, so another way to get notification when a module changes is implementing ```Observer```
+interface and register using the method ```<module_of_interest>.addObserver(o)```.
 
 ###Examples
 

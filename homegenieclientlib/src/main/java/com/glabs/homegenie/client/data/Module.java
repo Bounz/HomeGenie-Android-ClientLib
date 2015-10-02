@@ -21,6 +21,8 @@
 
 package com.glabs.homegenie.client.data;
 
+import java.util.Observable;
+
 import com.glabs.homegenie.client.Control;
 
 import java.io.Serializable;
@@ -28,7 +30,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Date;
 
-public class Module implements Serializable {
+public class Module extends Observable implements Serializable {
 
     public enum DeviceTypes implements Serializable {
         Generic,
@@ -50,10 +52,6 @@ public class Module implements Serializable {
     public ArrayList<ModuleParameter> Properties = new ArrayList<ModuleParameter>();
     
     public String RoutingNode;
-
-    // ViewModel
-    public Object Adapter;
-    public android.view.View View;
 
     public String getDisplayName() {
         return this.Name;
@@ -125,6 +123,8 @@ public class Module implements Serializable {
             mp = new ModuleParameter(name, v);
             Properties.add(mp);
         }
+        setChanged();
+        notifyObservers(mp);
     }
 
     public void setParameter(String name, String v, Date timestamp) {
@@ -136,6 +136,8 @@ public class Module implements Serializable {
             mp = new ModuleParameter(name, v);
             Properties.add(mp);
         }
+        setChanged();
+        notifyObservers(mp);
     }
 
     public void control(String apicommand, final Control.ApiRequestCallback callback) {

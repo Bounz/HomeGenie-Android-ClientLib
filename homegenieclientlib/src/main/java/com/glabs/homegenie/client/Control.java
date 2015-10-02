@@ -98,13 +98,16 @@ public class Control {
             _protocol = "http://";
     }
 
+    public static void setServerEventsListener(EventSourceListener listener) {
+        _listener = listener;
+    }
+
     public static void setTimeout(int millis) {
         _requestTimeout = millis;
     }
 
-    public static void connect(final DataUpdatedCallback callback, EventSourceListener listener) {
+    public static void connect(final DataUpdatedCallback callback) {
         disconnect();
-        _listener = listener;
         updateData(new DataUpdatedCallback() {
             @Override
             public void onRequestSuccess() {
@@ -119,7 +122,22 @@ public class Control {
         _sseTask = new EventSourceTask();
         _sseTask.execute(getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/");
     }
-    
+
+    public static void connect(final DataUpdatedCallback callback, EventSourceListener listener) {
+        connect(new DataUpdatedCallback() {
+            @Override
+            public void onRequestSuccess() {
+                callback.onRequestSuccess();
+            }
+
+            @Override
+            public void onRequestError(ApiRequestResult result) {
+                callback.onRequestError(result);
+            }
+        });
+        _listener = listener;
+    }
+
     public static void resume(final DataUpdatedCallback callback) {
         Control.getGroupModules("", new GroupModulesRequestCallback() {
             @Override

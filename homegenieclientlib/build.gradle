@@ -29,7 +29,6 @@ android {
 }
 
 dependencies {
-    compile 'com.android.support:support-v4:23.0.1'
     compile 'io.netty:netty-all:4.0.31.Final'
 }
 
