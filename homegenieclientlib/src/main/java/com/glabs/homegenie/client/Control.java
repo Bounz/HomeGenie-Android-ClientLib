@@ -1,18 +1,18 @@
 /*
-    This file is part of HomeGenie for Adnroid.
+    This file is part of HomeGenie for Android.
 
-    HomeGenie for Adnroid is free software: you can redistribute it and/or modify
+    HomeGenie for Android is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    HomeGenie for Adnroid is distributed in the hope that it will be useful,
+    HomeGenie for Android is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with HomeGenie for Adnroid.  If not, see <http://www.gnu.org/licenses/>.
+    along with HomeGenie for Android.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
@@ -33,7 +33,6 @@ import com.glabs.homegenie.client.eventsource.EventSourceTask;
 import com.glabs.homegenie.client.httprequest.HttpRequest;
 import com.glabs.homegenie.client.httprequest.HttpRequest.HttpRequestException;
 
-import org.apache.http.client.HttpResponseException;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -44,21 +43,33 @@ import java.util.TimeZone;
 
 public class Control {
 
-    public interface ServiceCallCallback {
-        void serviceCallCompleted(String response);
+    public interface ApiRequestCallback {
+        void onRequestSuccess(ApiRequestResult result);
+        void onRequestError(ApiRequestResult result);
     }
 
-    public interface GetGroupsCallback {
-        void groupsUpdated(boolean success, ArrayList<Group> groups);
+    public interface GroupsRequestCallback {
+        void onRequestSuccess(ArrayList<Group> groups);
+        void onRequestError(ApiRequestResult result);
     }
 
-    public interface GetGroupModulesCallback {
-        void groupModulesUpdated(ArrayList<Module> modules);
+    public interface GroupModulesRequestCallback {
+        void onRequestSuccess(ArrayList<Module> modules);
+        void onRequestError(ApiRequestResult result);
     }
 
-    public interface UpdateGroupsAndModulesCallback {
-        void groupsAndModulesUpdated(boolean success);
+    public interface DataUpdatedCallback {
+        void onRequestSuccess();
+        void onRequestError(ApiRequestResult result);
     }
+
+    public static class ApiRequestResult
+    {
+        public boolean Success;
+        public int StatusCode;
+        public String ResponseBody;
+    }
+
 
     private static String _hg_address;
     private static String _hg_user;
@@ -67,23 +78,13 @@ public class Control {
     private static boolean _hg_acceptAll;
 
     private static String _protocol = "http://";
+    private static int _requestTimeout = 15000;
 
     private static ArrayList<Module> _modules;
     private static ArrayList<Group> _groups;
 
     private static EventSourceListener _listener;
     private static EventSourceTask _sseTask;
-
-    private static String handleResponse(HttpRequest request) {
-        if (request.code() < 200 || request.code() >= 300) {
-            try {
-                throw new HttpResponseException(request.code(), request.message());
-            } catch (HttpResponseException e) {
-                e.printStackTrace();
-            }
-        }
-        return request.body();
-    }
 
     public static void setServer(String ip, String user, String pass, boolean ssl, boolean acceptAll) {
         _hg_address = ip;
@@ -97,23 +98,32 @@ public class Control {
             _protocol = "http://";
     }
 
-    public static void connect(final UpdateGroupsAndModulesCallback callback, EventSourceListener listener) {
+    public static void setTimeout(int millis) {
+        _requestTimeout = millis;
+    }
+
+    public static void connect(final DataUpdatedCallback callback, EventSourceListener listener) {
         disconnect();
         _listener = listener;
-        updateGroupAndModules(new UpdateGroupsAndModulesCallback() {
+        updateData(new DataUpdatedCallback() {
             @Override
-            public void groupsAndModulesUpdated(boolean success) {
-                callback.groupsAndModulesUpdated(success);
+            public void onRequestSuccess() {
+                callback.onRequestSuccess();
+            }
+
+            @Override
+            public void onRequestError(ApiRequestResult result) {
+                callback.onRequestError(result);
             }
         });
         _sseTask = new EventSourceTask();
         _sseTask.execute(getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/");
     }
     
-    public static void resume(final GetGroupModulesCallback callback) {
-        Control.getGroupModules("", new Control.GetGroupModulesCallback() {
+    public static void resume(final DataUpdatedCallback callback) {
+        Control.getGroupModules("", new GroupModulesRequestCallback() {
             @Override
-            public void groupModulesUpdated(ArrayList<Module> modules) {
+            public void onRequestSuccess(ArrayList<Module> modules) {
                 // update modules
             	if (modules != null)
             	for(Module m : modules) {
@@ -127,7 +137,11 @@ public class Control {
             			_modules.add(m);
             		}
             	}
-                callback.groupModulesUpdated(modules);
+                callback.onRequestSuccess();
+            }
+            @Override
+            public void onRequestError(ApiRequestResult result) {
+                callback.onRequestError(result);
             }
         });
         _sseTask = new EventSourceTask();
@@ -199,56 +213,67 @@ public class Control {
         return module;
     }
     
-    public static void updateGroupAndModules(final UpdateGroupsAndModulesCallback callback) {
+    public static void updateData(final DataUpdatedCallback callback) {
         // get complete list of modules
-        Control.getGroupModules("", new Control.GetGroupModulesCallback() {
+        Control.getGroupModules("", new GroupModulesRequestCallback() {
             @Override
-            public void groupModulesUpdated(ArrayList<Module> modules) {
-                if (modules == null) {
-                    // an error occurred
-                    callback.groupsAndModulesUpdated(false);
-                } else {
-                    _modules = modules;
-                    // get groups list
-                    Control.getGroups(new Control.GetGroupsCallback() {
-                        @Override
-                        public void groupsUpdated(boolean success, ArrayList<Group> groups) {
-                            if (success && groups.size() > 0) {
-                                _groups = groups;
-                                // link groups modules
-                                for (Group g : _groups) {
-                                    for (int m = 0; m < g.Modules.size(); m++) {
-                                        String domain = g.Modules.get(m).Domain;
-                                        String address = g.Modules.get(m).Address;
-                                        g.Modules.set(m, getModule(domain, address));
-                                    }
+            public void onRequestSuccess(ArrayList<Module> modules) {
+                _modules = modules;
+                // get groups list
+                Control.getGroups(new GroupsRequestCallback() {
+                    @Override
+                    public void onRequestSuccess(ArrayList<Group> groups) {
+                        if (groups.size() > 0) {
+                            _groups = groups;
+                            // link groups modules
+                            for (Group g : _groups) {
+                                for (int m = 0; m < g.Modules.size(); m++) {
+                                    String domain = g.Modules.get(m).Domain;
+                                    String address = g.Modules.get(m).Address;
+                                    g.Modules.set(m, getModule(domain, address));
                                 }
-                                callback.groupsAndModulesUpdated(true);
-                            } else {
-                                callback.groupsAndModulesUpdated(false);
                             }
+                            callback.onRequestSuccess();
+                        } else {
+                            callback.onRequestError(new ApiRequestResult());
                         }
-                    });
-                }
+                    }
+                    @Override
+                    public void onRequestError(ApiRequestResult result) {
+                        callback.onRequestError(result);
+                    }
+                });
+            }
+            @Override
+            public void onRequestError(ApiRequestResult result) {
+                callback.onRequestError(result);
             }
         });
     }
 
-    public static void getGroups(GetGroupsCallback callback) {
+    public static void getGroups(GroupsRequestCallback callback) {
         new GetGroupsRequest(callback).execute();
     }
 
-    public static void getGroupModules(String group, GetGroupModulesCallback callback) {
+    public static void getGroupModules(String group, GroupModulesRequestCallback callback) {
         new GetGroupModulesRequest(group, callback).execute();
 
     }
 
-    public static void callServiceApi(String servicecall, ServiceCallCallback callback) {
-        new ServiceCallRequest(servicecall, callback).execute();
+    public static void apiRequest(String servicecall, ApiRequestCallback callback) {
+        new ApiRequest(servicecall, callback).execute();
     }
 
     public static HttpRequest getHttpGetRequest(String url) {
         HttpRequest request = HttpRequest.get(url);
+        // Set the timeout in milliseconds until a connection is established.
+        // The default value is zero, that means the timeout is not used.
+        int timeoutConnection = _requestTimeout;
+        request.connectTimeout(timeoutConnection);
+        // Set the default socket timeout (SO_TIMEOUT)
+        // in milliseconds which is the timeout for waiting for data.
+        int timeoutSocket = _requestTimeout;
+        request.readTimeout(timeoutSocket);
         if (!_hg_user.equals("") && !_hg_pass.equals(""))
             request.basic(_hg_user, _hg_pass);
         if (_hg_acceptAll && _hg_ssl) {
@@ -258,6 +283,7 @@ public class Control {
         return request;
     }
 
+    // TODO: move this to the Utility class
     public static String getUpnpDisplayName(Module m) {
         String desc = m.getDisplayAddress();
         if (m.getParameter("UPnP.ModelDescription") != null && !m.getParameter("UPnP.ModelDescription").Value.trim().equals("")) {
@@ -268,111 +294,116 @@ public class Control {
         return desc;
     }
 
-    public static class ServiceCallRequest extends AsyncTask<String, Boolean, String> {
+    public static class ApiRequest extends AsyncTask<String, Boolean, ApiRequestResult> {
 
         private String serviceUrl;
         //
-        private ServiceCallCallback callback;
+        private ApiRequestCallback callback;
 
-        public ServiceCallRequest(String servicecall, ServiceCallCallback callback) {
+        public ApiRequest(String servicecall, ApiRequestCallback callback) {
             this.serviceUrl = _protocol + _hg_address + "/api/" + servicecall;
             this.callback = callback;
         }
 
         @Override
-        protected String doInBackground(String... params) {
-            //execute the post
+        protected ApiRequestResult doInBackground(String... params) {
+            ApiRequestResult result = new ApiRequestResult();
+            //execute the request
             try {
                 HttpRequest request = getHttpGetRequest(serviceUrl);
-                return handleResponse(request);
+                result.ResponseBody = request.body();
+                result.StatusCode = request.code();
+                result.Success = (request.code() < 400);
+                return result;
             } catch (HttpRequestException e) {
                 //Log.e("AsyncOperationFailed", e.getMessage());
+                result.ResponseBody = e.getMessage();
                 e.printStackTrace();
             }
-
-            return "";
+            return result;
         }
 
-        protected void onPostExecute(String response) {
+        protected void onPostExecute(ApiRequestResult result) {
             if (callback != null) {
-                callback.serviceCallCompleted(response);
+                if (result.Success)
+                    callback.onRequestSuccess(result);
+                else
+                    callback.onRequestError(result);
             }
         }
     }
 
-    public static class GetGroupsRequest extends AsyncTask<String, Boolean, String> {
+    public static class GetGroupsRequest extends AsyncTask<String, Boolean, ApiRequestResult> {
 
         private String serviceUrl;
         //
-        private GetGroupsCallback callback;
+        private GroupsRequestCallback callback;
 
-        public GetGroupsRequest(GetGroupsCallback callback) {
+        public GetGroupsRequest(GroupsRequestCallback callback) {
             this.serviceUrl = _protocol + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Groups.List/";
             this.callback = callback;
         }
 
         @Override
-        protected String doInBackground(String... params) {
-            //execute the post
+        protected ApiRequestResult doInBackground(String... params) {
+            ApiRequestResult result = new ApiRequestResult();
+            //execute the request
             try {
                 HttpRequest request = getHttpGetRequest(serviceUrl);
-                // Set the timeout in milliseconds until a connection is established.
-                // The default value is zero, that means the timeout is not used.
-                int timeoutConnection = 10000;
-                request.connectTimeout(timeoutConnection);
-                // Set the default socket timeout (SO_TIMEOUT)
-                // in milliseconds which is the timeout for waiting for data.
-                int timeoutSocket = 10000;
-                request.readTimeout(timeoutSocket);
-                return handleResponse(request);
+                result.ResponseBody = request.body();
+                result.StatusCode = request.code();
+                result.Success = (request.code() < 400);
+                return result;
             } catch (HttpRequestException e) {
-                if (callback != null) callback.groupsUpdated(false, new ArrayList<Group>());
-//                Log.e("AsyncOperationFailed", e.getMessage());
+                //Log.e("AsyncOperationFailed", e.getMessage());
+                result.ResponseBody = e.getMessage();
                 e.printStackTrace();
             }
-
-            return "";
+            return result;
         }
 
-        protected void onPostExecute(String jsonString) {
+        protected void onPostExecute(ApiRequestResult result) {
 
-            if (jsonString == null || jsonString.equals("")) return;
-            //
-            ArrayList<Group> groups = new ArrayList<Group>();
-            try {
-                JSONArray jgroups = new JSONArray(jsonString);
-                for (int g = 0; g < jgroups.length(); g++) {
-                    JSONObject jg = (JSONObject) jgroups.get(g);
-                    Group group = new Group();
-                    group.Name = jg.getString("Name");
-                    JSONArray jgmodules = jg.getJSONArray("Modules");
-                    for (int m = 0; m < jgmodules.length(); m++) {
-                        JSONObject jmp = (JSONObject) jgmodules.get(m);
-                        Module mod = new Module();
-                        mod.Domain = jmp.getString("Domain");
-                        mod.Address = jmp.getString("Address");
-                        group.Modules.add(mod);
+            if (result.Success) {
+                String jsonString = result.ResponseBody;
+                ArrayList<Group> groups = new ArrayList<Group>();
+                try {
+                    JSONArray jGroups = new JSONArray(jsonString);
+                    for (int g = 0; g < jGroups.length(); g++) {
+                        JSONObject jg = (JSONObject) jGroups.get(g);
+                        Group group = new Group();
+                        group.Name = jg.getString("Name");
+                        JSONArray jgmodules = jg.getJSONArray("Modules");
+                        for (int m = 0; m < jgmodules.length(); m++) {
+                            JSONObject jmp = (JSONObject) jgmodules.get(m);
+                            Module mod = new Module();
+                            mod.Domain = jmp.getString("Domain");
+                            mod.Address = jmp.getString("Address");
+                            group.Modules.add(mod);
+                        }
+                        groups.add(group);
                     }
-                    groups.add(group);
+                    if (callback != null)
+                        callback.onRequestSuccess(groups);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    if (callback != null)
+                        callback.onRequestError(new ApiRequestResult());
                 }
-                if (callback != null) callback.groupsUpdated(true, groups);
-            } catch (JSONException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-                if (callback != null) callback.groupsUpdated(false, groups);
+            } else {
+                callback.onRequestError(result);
             }
-
         }
     }
 
 
-    public static class GetGroupModulesRequest extends AsyncTask<String, Boolean, String> {
+    public static class GetGroupModulesRequest extends AsyncTask<String, Boolean, ApiRequestResult> {
 
         private String serviceUrl;
         //
-        private GetGroupModulesCallback callback;
+        private GroupModulesRequestCallback callback;
 
-        public GetGroupModulesRequest(String groupName, GetGroupModulesCallback callback) {
+        public GetGroupModulesRequest(String groupName, GroupModulesRequestCallback callback) {
             if (groupName.equals("")) {
                 this.serviceUrl = _protocol + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Modules.List/";
             } else {
@@ -382,60 +413,69 @@ public class Control {
         }
 
         @Override
-        protected String doInBackground(String... params) {
-            //execute the post
+        protected ApiRequestResult doInBackground(String... params) {
+            ApiRequestResult result = new ApiRequestResult();
+            //execute the request
             try {
                 HttpRequest request = getHttpGetRequest(serviceUrl);
-                return handleResponse(request);
+                result.ResponseBody = request.body();
+                result.StatusCode = request.code();
+                result.Success = (request.code() < 400);
+                return result;
             } catch (HttpRequestException e) {
-//                Log.e("AsyncOperationFailed", e.getMessage());
+                //Log.e("AsyncOperationFailed", e.getMessage());
+                result.ResponseBody = e.getMessage();
                 e.printStackTrace();
-                if (callback != null) callback.groupModulesUpdated(null);
             }
-
-            return "";
+            return result;
         }
 
-        protected void onPostExecute(String jsonString) {
+        protected void onPostExecute(ApiRequestResult result) {
+            if (result.Success) {
+                String jsonString = result.ResponseBody;
 
-            if (jsonString == null || jsonString.equals("")) return;
+                if (jsonString == null || jsonString.equals("")) return;
 
-            ArrayList<Module> modlist = new ArrayList<Module>();
-            try {
-                JSONArray groupmodules = new JSONArray(jsonString);
-                for (int m = 0; m < groupmodules.length(); m++) {
-                    JSONObject jm = (JSONObject) groupmodules.get(m);
-                    Module module = new Module();
-                    module.Domain = jm.getString("Domain");
-                    module.Address = jm.getString("Address");
-                    module.DeviceType = jm.getString("DeviceType");
-                    module.Name = jm.getString("Name");
-                    module.Description = jm.getString("Description");
-                    module.RoutingNode = jm.getString("RoutingNode");
-                    //
-                    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                    dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-                    //
-                    JSONArray jmproperties = jm.getJSONArray("Properties");
-                    for (int p = 0; p < jmproperties.length(); p++) {
-                        JSONObject jmp = (JSONObject) jmproperties.get(p);
-                        ModuleParameter param = new ModuleParameter(jmp.getString("Name"), jmp.getString("Value"));
-                        param.Description = jmp.getString("Description");
-                        try {
-                            param.UpdateTime = dateFormat.parse(jmp.getString("UpdateTime"));
-                        } catch (Exception e) {
+                ArrayList<Module> moduleList = new ArrayList<Module>();
+                try {
+                    JSONArray groupModules = new JSONArray(jsonString);
+                    for (int m = 0; m < groupModules.length(); m++) {
+                        JSONObject jm = (JSONObject) groupModules.get(m);
+                        Module module = new Module();
+                        module.Domain = jm.getString("Domain");
+                        module.Address = jm.getString("Address");
+                        module.DeviceType = jm.getString("DeviceType");
+                        module.Name = jm.getString("Name");
+                        module.Description = jm.getString("Description");
+                        module.RoutingNode = jm.getString("RoutingNode");
+                        //
+                        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                        dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+                        //
+                        JSONArray jmProperties = jm.getJSONArray("Properties");
+                        for (int p = 0; p < jmProperties.length(); p++) {
+                            JSONObject jmp = (JSONObject) jmProperties.get(p);
+                            ModuleParameter param = new ModuleParameter(jmp.getString("Name"), jmp.getString("Value"));
+                            param.Description = jmp.getString("Description");
+                            try {
+                                param.UpdateTime = dateFormat.parse(jmp.getString("UpdateTime"));
+                            } catch (Exception e) {
+                            }
+                            module.Properties.add(param);
                         }
-                        module.Properties.add(param);
+                        moduleList.add(module);
                     }
-                    modlist.add(module);
+                    if (callback != null)
+                        callback.onRequestSuccess(moduleList);
+                } catch (JSONException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                    if (callback != null)
+                        callback.onRequestError(new ApiRequestResult());
                 }
-            } catch (JSONException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-                if (callback != null) callback.groupModulesUpdated(null);
+            } else {
+                callback.onRequestError(result);
             }
-            if (callback != null) callback.groupModulesUpdated(modlist);
-
         }
     }
 

@@ -28,21 +28,23 @@ Estabilishing a connection to HG from a class implementing EventSourceListener :
             Control.setServer(
                     "192.168.1.10",
                     "admin",
-                    "thepassword"
+                    "thepassword",
+                    false, // Use SSL?
+                    false  // Accept all SSL certificates?
             );
             
-            Control.connect(new Control.UpdateGroupsAndModulesCallback() {  // <-- This is a very looong callback name, isn't it? =)
+            Control.connect(new Control.DataUpdatedCallback() {
                 @Override
-                public void groupsAndModulesUpdated(boolean success) {
-                    if (success) {
-                    
-                       // Connection succesful
-                    
-                    } else {
-                    
-                       // Connection failed
-                    
-                    }
+                public void onRequestSuccess() {
+                    // Connection succesful, groups and modules updated
+                    // use Control.getModules() and Control.getGroups()
+                    // to get groups and modules list
+                }
+                @Override
+                public void onRequestError(Control.ApiRequestResult apiRequestResult) {
+                    // Connection error!
+                    // apiRequestResult.StatusCode and apiRequestResult.ResponseBody properties
+                    // hold the error data
                 }
             }, this);
             
@@ -93,11 +95,17 @@ Accessing Groups and Modules data structures:
     Module module = Control.getModule("HomeAutomation.X10", "B3");
     
     // making a service API call
-    Control.callServiceApi("HomeAutomation.HomeGenie/Config/Groups.List", new ServiceCallCallback(){
+    Control.apiRequest("HomeAutomation.HomeGenie/Config/Groups.List", new ApiRequestCallback(){
         @Override
-        public void serviceCallCompleted(String response)
-        {
-            // handle response here...
+        public void onRequestSuccess(ApiRequestResult result) {
+            // handle response here, 
+            // result.ResponseBody hold the text of the response
+        }
+        @Override
+        public void onRequestError(ApiRequestResult result) {
+            // Request error!
+            // apiRequestResult.StatusCode and apiRequestResult.ResponseBody properties
+            // hold the error data
         }
     });
 

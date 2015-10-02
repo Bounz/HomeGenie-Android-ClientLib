@@ -1,18 +1,18 @@
 /*
-    This file is part of HomeGenie for Adnroid.
+    This file is part of HomeGenie for Android.
 
-    HomeGenie for Adnroid is free software: you can redistribute it and/or modify
+    HomeGenie for Android is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
     (at your option) any later version.
 
-    HomeGenie for Adnroid is distributed in the hope that it will be useful,
+    HomeGenie for Android is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with HomeGenie for Adnroid.  If not, see <http://www.gnu.org/licenses/>.
+    along with HomeGenie for Android.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /*
@@ -23,13 +23,14 @@ package com.glabs.homegenie.client.data;
 
 import com.glabs.homegenie.client.Control;
 
+import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Date;
 
-public class Module {
+public class Module implements Serializable {
 
-    public enum DeviceTypes {
+    public enum DeviceTypes implements Serializable {
         Generic,
         Sensor,
         Dimmer,
@@ -137,11 +138,18 @@ public class Module {
         }
     }
 
-    public void control(String apicommand, final Control.ServiceCallCallback callback) {
-        Control.callServiceApi(this.Domain + "/" + this.Address + "/" + apicommand, new Control.ServiceCallCallback() {
+    public void control(String apicommand, final Control.ApiRequestCallback callback) {
+        Control.apiRequest(this.Domain + "/" + this.Address + "/" + apicommand, new Control.ApiRequestCallback() {
             @Override
-            public void serviceCallCompleted(String response) {
-                if (callback != null) callback.serviceCallCompleted(response);
+            public void onRequestSuccess(Control.ApiRequestResult result) {
+                if (callback != null)
+                    callback.onRequestSuccess(result);
+            }
+
+            @Override
+            public void onRequestError(Control.ApiRequestResult result) {
+                if (callback != null)
+                    callback.onRequestError(result);
             }
         });
     }
