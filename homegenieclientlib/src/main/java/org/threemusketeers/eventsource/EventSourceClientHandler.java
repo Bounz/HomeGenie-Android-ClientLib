@@ -36,6 +36,7 @@ public class EventSourceClientHandler extends SimpleChannelInboundHandler<Object
     String authPassword = "";
     EventSourceNotification notification;
     EventSource eventSource;
+    boolean disableAutoReconnect;
     Channel channel;
     EventSourceHandshaker handshaker = new EventSourceHandshaker();
     Message message;
@@ -44,28 +45,31 @@ public class EventSourceClientHandler extends SimpleChannelInboundHandler<Object
     long reconnectDelay = 2000;
     String messageType;
 
-    EventSourceClientHandler(URI uri, String user, String password, EventSourceNotification notification, EventSource eventSource) {
+    EventSourceClientHandler(URI uri, String user, String password, EventSourceNotification notification, EventSource eventSource, boolean disableAutoReconnect) {
         super();
         this.uri = uri;
         this.authUser = user;
         this.authPassword = password;
         this.notification = notification;
         this.eventSource = eventSource;
+        this.disableAutoReconnect = disableAutoReconnect;
     }
 
     @Override
     public void channelUnregistered(final ChannelHandlerContext ctx) throws Exception {
-        if (!closed) {
-            notification.onError("RECONNECTING");
+        notification.onError("Disconnected");
+        if (!disableAutoReconnect && !closed) {
             final EventLoop loop = ctx.channel().eventLoop();
 
             // Wait a delay equal to the reconnection time of the event source.
             loop.schedule(new Runnable() {
                 @Override
                 public void run() {
-                    handshaker = new EventSourceHandshaker();
-                    // Reconnect
-                    eventSource.createBootstrap();
+                    if (!closed) {
+                        handshaker = new EventSourceHandshaker();
+                        // Reconnect
+                        eventSource.createBootstrap();
+                    }
                 }
             }, reconnectDelay, TimeUnit.MILLISECONDS);
         }
@@ -140,9 +144,16 @@ public class EventSourceClientHandler extends SimpleChannelInboundHandler<Object
             return;
         }
 
-        if (this.channel.isOpen()) {
+        //if (this.channel.isOpen()) {
+        //    this.channel.close();
+        //}
+        try {
+            this.channel.disconnect();
+        } catch (Exception e) { }
+        try {
             this.channel.close();
-        }
+        } catch (Exception e) { }
+        this.channel = null;
     }
 
     FullHttpRequest getConnectHttpRequest() {
@@ -185,7 +196,7 @@ public class EventSourceClientHandler extends SimpleChannelInboundHandler<Object
 
     // Check if this is useful in case the person do not close the eventsource 
     // but do not use it anymore
-    protected void finalize() throws Throwable {
+    protected void finalize() { // throws Throwable {
         this.close();
     }
 }

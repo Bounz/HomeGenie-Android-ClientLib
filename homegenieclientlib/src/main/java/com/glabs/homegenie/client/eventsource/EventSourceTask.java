@@ -41,35 +41,26 @@ import io.netty.channel.nio.NioEventLoopGroup;
 /**
  * Created by Gene on 29/04/14.
  */
-public class EventSourceTask extends AsyncTask<String, Void, Void> implements EventSourceNotification {
+public class EventSourceTask implements EventSourceNotification {
 
-    private Exception exception;
     private EventSource eventSource;
 
-    public EventSourceTask()
+    public EventSourceTask(String url, boolean disableAutoReconnect)
     {
+        eventSource = new EventSource(url, Control.getAuthUser(), Control.getAuthPassword(), new NioEventLoopGroup(), this, disableAutoReconnect);
     }
 
     public void stop()
     {
+        Control.debug("[EventSourceTask] stopping...");
         if (eventSource != null)
         {
+            if (Control.enableDebug)
+                System.out.println("[EventSourceTask] closing eventSource");
             eventSource.close();
             eventSource = null;
         }
-    }
-
-    protected Void doInBackground(String... urls) {
-        try {
-            eventSource = new EventSource(urls[0], Control.getAuthUser(), Control.getAuthPassword(), new NioEventLoopGroup(), this);
-        } catch (Exception e) {
-            this.exception = e;
-        }
-        return null;
-    }
-
-    protected void onPostExecute() {
-        // TODO: check this.exception
+        Control.debug("[EventSourceTask] stopped");
     }
 
     @Override
@@ -79,7 +70,7 @@ public class EventSourceTask extends AsyncTask<String, Void, Void> implements Ev
 
     @Override
     public void onMessage(Message message) {
-        Log.d("EventSource.Message", message.data);
+        Control.debug(String.format("[EventSourceTask] onMessage: %s", message.data));
         //
         try {
             JSONObject jevent = new JSONObject(message.data);

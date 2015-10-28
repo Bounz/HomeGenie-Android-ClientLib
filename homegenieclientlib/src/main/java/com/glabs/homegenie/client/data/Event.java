@@ -22,6 +22,7 @@
 package com.glabs.homegenie.client.data;
 
 import java.io.Serializable;
+import java.sql.Time;
 import java.util.Date;
 
 /**

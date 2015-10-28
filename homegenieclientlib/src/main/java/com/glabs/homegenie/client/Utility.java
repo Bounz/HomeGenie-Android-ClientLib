@@ -26,4 +26,8 @@ package com.glabs.homegenie.client;
  */
 public class Utility {
 
+    public static boolean isNullOrWhiteSpace(String s) {
+        return (s == null || s.equals("") || s.trim().equals(""));
+    }
+
 }

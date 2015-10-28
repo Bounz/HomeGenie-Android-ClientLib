@@ -40,6 +40,7 @@ import org.json.JSONObject;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.TimeZone;
+import java.util.concurrent.Semaphore;
 
 public class Control {
 
@@ -85,6 +86,11 @@ public class Control {
 
     private static EventSourceListener _listener;
     private static EventSourceTask _sseTask;
+    private static boolean _isPaused;
+    //private static Semaphore _connectSemaphore = new Semaphore(1, true);
+    private static boolean _disableAutoreconnect;
+
+    public static boolean enableDebug = false;
 
     public static void setServer(String ip, String user, String pass, boolean ssl, boolean acceptAll) {
         _hg_address = ip;
@@ -105,25 +111,39 @@ public class Control {
     public static void setTimeout(int millis) {
         _requestTimeout = millis;
     }
+    public static void setDisableAutoreconnect(boolean disable) {
+        _disableAutoreconnect = disable;
+    }
 
-    public static void connect(final DataUpdatedCallback callback) {
+    public static void connect(final DataUpdatedCallback callback) throws InterruptedException {
         disconnect();
+        debug("[Control] connect() begin");
+        //debug("[Control] connect() waiting semaphore");
+        //_connectSemaphore.acquire();
+        //debug("[Control] connect() semaphore acquired");
         updateData(new DataUpdatedCallback() {
             @Override
             public void onRequestSuccess() {
+                debug("[Control] connect() onRequestSuccess");
+                if (!_isPaused)
+                    _sseTask = new EventSourceTask(getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/", _disableAutoreconnect);
+                //_connectSemaphore.release();
+                //debug("[Control] connect() semaphore released");
                 callback.onRequestSuccess();
             }
 
             @Override
             public void onRequestError(ApiRequestResult result) {
+                debug("[Control] connect() onRequestError");
+                //_connectSemaphore.release();
+                //debug("[Control] connect() semaphore released");
                 callback.onRequestError(result);
             }
         });
-        _sseTask = new EventSourceTask();
-        _sseTask.execute(getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/");
+        debug("[Control] connect() end");
     }
 
-    public static void connect(final DataUpdatedCallback callback, EventSourceListener listener) {
+    public static void connect(final DataUpdatedCallback callback, EventSourceListener listener) throws InterruptedException {
         connect(new DataUpdatedCallback() {
             @Override
             public void onRequestSuccess() {
@@ -138,43 +158,70 @@ public class Control {
         _listener = listener;
     }
 
-    public static void resume(final DataUpdatedCallback callback) {
+    public static void resume(final DataUpdatedCallback callback) throws InterruptedException {
+        debug("[Control] resume() begin");
+        pause();
+        _isPaused = false;
+        //debug("[Control] resume() waiting semaphore");
+        //_connectSemaphore.acquire();
+        //debug("[Control] resume() semaphore acquired");
+        debug("[Control] resume() getGroupModules");
         Control.getGroupModules("", new GroupModulesRequestCallback() {
             @Override
             public void onRequestSuccess(ArrayList<Module> modules) {
+                debug("[Control] resume() getGroupModules -> onRequestSuccess");
                 // update modules
-            	if (modules != null)
-            	for(Module m : modules) {
-            		Module cm = getModule(m.Domain, m.Address);
-            		if (cm != null) {
-            			cm.Name = m.Name;
-            			for (ModuleParameter p : m.Properties) {
-            				cm.setParameter(p.Name, p.Value, p.UpdateTime); 
-            			}
-            		} else if (_modules != null) {
-            			_modules.add(m);
-            		}
-            	}
+                if (modules != null) {
+                    if (_modules == null)
+                        _modules = new ArrayList<Module>();
+                    for (Module m : modules) {
+                        Module cm = getModule(m.Domain, m.Address);
+                        if (cm != null) {
+                            cm.Name = m.Name;
+                            for (ModuleParameter p : m.Properties) {
+                                ModuleParameter cp = cm.getParameter(p.Name);
+                                if (cp == null || !cp.UpdateTime.equals(p.UpdateTime))
+                                    cm.setParameter(p.Name, p.Value, p.UpdateTime);
+                            }
+                        } else {
+                            _modules.add(m);
+                        }
+                    }
+                }
+                if (!_isPaused)
+                    _sseTask = new EventSourceTask(getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/", _disableAutoreconnect);
+                //_connectSemaphore.release();
+                //debug("[Control] resume() getGroupModules semaphore released");
                 callback.onRequestSuccess();
             }
+
             @Override
             public void onRequestError(ApiRequestResult result) {
+                debug("[Control] resume() getGroupModules -> onRequestError");
+                //_connectSemaphore.release();
+                //debug("[Control] resume() getGroupModules semaphore released");
                 callback.onRequestError(result);
             }
         });
-        _sseTask = new EventSourceTask();
-        _sseTask.execute(getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/");
+        debug("[Control] resume() end");
     }
 
-    public static void pause() {
+    public static void pause() throws InterruptedException {
+        _isPaused = true;
+        debug("[Control] pause() begin");
         if (_sseTask != null) {
             _sseTask.stop();
             //_sseTask.cancel(true);
             _sseTask = null;
-        }    	
+        }
+        debug("[Control] pause() end");
     }
     
-    public static void disconnect() {
+    public static void disconnect() throws InterruptedException {
+        debug("[Control] disconnect() begin");
+        //debug("[Control] disconnect() waiting semaphore");
+        //_connectSemaphore.acquire();
+        //debug("[Control] disconnect() semaphore acquired");
         _listener = null;
         if (_sseTask != null) {
             _sseTask.stop();
@@ -189,6 +236,9 @@ public class Control {
             _modules.clear();
             _modules = null;
         }
+        //_connectSemaphore.release();
+        //debug("[Control] resume() getGroupModules semaphore released");
+        debug("[Control] disconnect() end");
     }
 
     public static String getAuthUser() {
@@ -220,9 +270,13 @@ public class Control {
     }
 
     public static Module getModule(String domain, String address) {
+        return getModule(_modules, domain, address);
+    }
+
+    public static Module getModule(ArrayList<Module> modules, String domain, String address) {
         Module module = null;
-        if (_modules != null)
-        for(Module m : _modules) {
+        if (modules != null)
+        for(Module m : modules) {
             if (m.Domain.equals(domain) && m.Address.equals(address)) {
                 module = m;
                 break;
@@ -238,29 +292,58 @@ public class Control {
             public void onRequestSuccess(ArrayList<Module> modules) {
                 _modules = modules;
                 // get groups list
-                Control.getGroups(new GroupsRequestCallback() {
+                updateGroups(new GroupsRequestCallback() {
                     @Override
                     public void onRequestSuccess(ArrayList<Group> groups) {
-                        if (groups.size() > 0) {
-                            _groups = groups;
-                            // link groups modules
-                            for (Group g : _groups) {
-                                for (int m = 0; m < g.Modules.size(); m++) {
-                                    String domain = g.Modules.get(m).Domain;
-                                    String address = g.Modules.get(m).Address;
-                                    g.Modules.set(m, getModule(domain, address));
-                                }
-                            }
-                            callback.onRequestSuccess();
-                        } else {
-                            callback.onRequestError(new ApiRequestResult());
-                        }
+                        callback.onRequestSuccess();
                     }
+
                     @Override
                     public void onRequestError(ApiRequestResult result) {
                         callback.onRequestError(result);
                     }
                 });
+            }
+
+            @Override
+            public void onRequestError(ApiRequestResult result) {
+                callback.onRequestError(result);
+            }
+        });
+    }
+
+    public static void updateGroups(final GroupsRequestCallback callback) {
+        Control.getGroups(new GroupsRequestCallback() {
+            @Override
+            public void onRequestSuccess(ArrayList<Group> groups) {
+                if (groups.size() > 0) {
+                    _groups = groups;
+                    // link groups modules
+                    for (Group g : _groups) {
+                        for (int m = 0; m < g.Modules.size(); m++) {
+                            String domain = g.Modules.get(m).Domain;
+                            String address = g.Modules.get(m).Address;
+                            if (domain.equals("HomeGenie.UI.Separator")) {
+                                // UI.Separator is not a real module, it is
+                                // a fake module used by the UI
+                                Module gm = g.Modules.get(m);
+                                gm.Name = address;
+                                gm.DeviceType = "";
+                                gm.Description = "UI Separator";
+                                gm.Properties = new ArrayList<ModuleParameter>();
+                            } else {
+                                Module module = getModule(domain, address);
+                                if (module == null)
+                                    g.Modules.remove(m);
+                                else
+                                    g.Modules.set(m, module);
+                            }
+                        }
+                    }
+                    callback.onRequestSuccess(_groups);
+                } else {
+                    callback.onRequestError(new ApiRequestResult());
+                }
             }
             @Override
             public void onRequestError(ApiRequestResult result) {
@@ -525,4 +608,9 @@ public class Control {
         }
     }
 
+    public static void debug(String s) {
+        if (enableDebug) {
+            System.out.println(s);
+        }
+    }
 }

@@ -26,6 +26,7 @@ import com.glabs.homegenie.client.Control;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
@@ -57,8 +58,10 @@ public class EventSource {
     private Bootstrap bootstrap;
     private URI uri;
     private EventSourceClientHandler handler;
+    private ChannelFuture channelFuture;
 
-    public EventSource(String url,String user, String password, EventLoopGroup group, EventSourceNotification notification) {
+    public EventSource(String url,String user, String password, EventLoopGroup group, EventSourceNotification notification, boolean disableAutoReconnect) {
+        //System.out.println("[EventSource] constructor start");
         this.group = group;
         this.uri = URI.create(url);
         String protocol = uri.getScheme();
@@ -67,14 +70,28 @@ public class EventSource {
             return;
         }
 
-        handler = new EventSourceClientHandler(uri, user, password, notification, this);
-        createBootstrap();
+        handler = new EventSourceClientHandler(uri, user, password, notification, this, disableAutoReconnect);
+        channelFuture = createBootstrap();
+        //System.out.println("[EventSource] constructor end");
     }
 
     public void close() {
-        if (handler != null) {
-            handler.close();
+        //System.out.println("[EventSource] closing...");
+        if (channelFuture != null) {
+            try {
+                //System.out.println("[EventSource] waiting pending channelFuture operation");
+                channelFuture.await();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            channelFuture = null;
         }
+        if (handler != null) {
+            //System.out.println("[EventSource] closing handler");
+            handler.close();
+            handler = null;
+        }
+        //System.out.println("[EventSource] closed");
     }
 
     /**
@@ -97,7 +114,7 @@ public class EventSource {
         }
     }
 
-    void createBootstrap() {
+    ChannelFuture createBootstrap() {
         bootstrap = new Bootstrap();
         bootstrap.group(group)
                 .channel(NioSocketChannel.class)
@@ -144,7 +161,7 @@ public class EventSource {
                 port = 443;
             }
         }
-        bootstrap.connect(uri.getHost(), port);
+        return bootstrap.connect(uri.getHost(), port);
     }
 
     protected void finalize() throws Throwable {

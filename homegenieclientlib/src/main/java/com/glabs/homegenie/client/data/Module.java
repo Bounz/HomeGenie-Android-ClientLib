@@ -24,6 +24,7 @@ package com.glabs.homegenie.client.data;
 import java.util.Observable;
 
 import com.glabs.homegenie.client.Control;
+import com.glabs.homegenie.client.Utility;
 
 import java.io.Serializable;
 import java.text.DecimalFormat;
@@ -54,7 +55,10 @@ public class Module extends Observable implements Serializable {
     public String RoutingNode;
 
     public String getDisplayName() {
-        return this.Name;
+        String name = this.Name;
+        if (Utility.isNullOrWhiteSpace(name))
+            name = getDisplayAddress();
+        return name;
     }
 
     public String getDisplayAddress() {
@@ -62,7 +66,7 @@ public class Module extends Observable implements Serializable {
         if (domain.indexOf('.') > 0) {
             domain = domain.substring(domain.lastIndexOf('.') + 1);
         }
-        return domain + " " + this.DeviceType + " " + this.Address;
+        return domain + " " + this.Address + " " + this.DeviceType;
     }
 
     public static double getDoubleValue(String propvalue) {
