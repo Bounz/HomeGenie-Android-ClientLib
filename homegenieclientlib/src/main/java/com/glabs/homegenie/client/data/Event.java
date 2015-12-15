@@ -29,7 +29,9 @@ import java.util.Date;
  * Created by Gene on 29/04/14.
  */
 public class Event implements Serializable {
-// {"Timestamp":"2014-04-29T14:19:19.945118Z","Domain":"HomeAutomation.ZWave","Source":"8","Description":"ZWave Node","Property":"Meter.Watts","Value":"0.0","UnixTimestamp":1398781159945.1179}
+    static final long serialVersionUID = -5715608313327113440L;
+
+    // {"Timestamp":"2014-04-29T14:19:19.945118Z","Domain":"HomeAutomation.ZWave","Source":"8","Description":"ZWave Node","Property":"Meter.Watts","Value":"0.0","UnixTimestamp":1398781159945.1179}
     //public Date Timestamp;
     public String Domain;
     public String Source;

@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Date;
 
 public class Module extends Observable implements Serializable {
+    static final long serialVersionUID = -4283083644322881041L;
 
     public enum DeviceTypes implements Serializable {
         Generic,
@@ -72,8 +73,9 @@ public class Module extends Observable implements Serializable {
     public static double getDoubleValue(String propvalue) {
         double doubleval = 0;
         try {
-            doubleval = Double.parseDouble(propvalue);
+            doubleval = Double.parseDouble(propvalue.replace(",", "."));
         } catch (Exception e) {
+            e.printStackTrace();
         }
         return doubleval;
     }
@@ -99,8 +101,9 @@ public class Module extends Observable implements Serializable {
         String formattedval = "";
         if (propvalue != null && !propvalue.equals("")) {
             try {
-                formattedval = decimalFormatter.format(Double.parseDouble(propvalue));
+                formattedval = decimalFormatter.format(getDoubleValue(propvalue));
             } catch (Exception e) {
+                e.printStackTrace();
             }
         }
         return formattedval;

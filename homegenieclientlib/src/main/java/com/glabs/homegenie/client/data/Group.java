@@ -25,11 +25,11 @@ import java.io.Serializable;
 import java.util.ArrayList;
 
 public class Group implements Serializable {
-    public String Name;
-    //
-    public ArrayList<Module> Modules;
+    static final long serialVersionUID = -2706324353087879435L;
 
-    //
+    public String Name;
+    public String Wallpaper;
+    public ArrayList<Module> Modules;
     public Group() {
         Modules = new ArrayList<Module>();
     }

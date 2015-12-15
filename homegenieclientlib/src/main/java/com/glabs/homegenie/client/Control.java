@@ -320,6 +320,7 @@ public class Control {
                     _groups = groups;
                     // link groups modules
                     for (Group g : _groups) {
+                        ArrayList<Integer> toRemove = new ArrayList<Integer>();
                         for (int m = 0; m < g.Modules.size(); m++) {
                             String domain = g.Modules.get(m).Domain;
                             String address = g.Modules.get(m).Address;
@@ -334,10 +335,13 @@ public class Control {
                             } else {
                                 Module module = getModule(domain, address);
                                 if (module == null)
-                                    g.Modules.remove(m);
+                                    toRemove.add(m);
                                 else
                                     g.Modules.set(m, module);
                             }
+                        }
+                        for (Integer rm : toRemove) {
+                            g.Modules.remove(rm);
                         }
                     }
                     callback.onRequestSuccess(_groups);
@@ -474,6 +478,7 @@ public class Control {
                         JSONObject jg = (JSONObject) jGroups.get(g);
                         Group group = new Group();
                         group.Name = jg.getString("Name");
+                        group.Wallpaper = jg.getString("Wallpaper");
                         JSONArray jgmodules = jg.getJSONArray("Modules");
                         for (int m = 0; m < jgmodules.length(); m++) {
                             JSONObject jmp = (JSONObject) jgmodules.get(m);
