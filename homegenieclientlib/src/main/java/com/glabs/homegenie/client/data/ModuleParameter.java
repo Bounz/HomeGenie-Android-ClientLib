@@ -35,6 +35,6 @@ public class ModuleParameter implements Serializable {
     public String Name = "";
     public String Value = "";
     public String Description = "";
-    public Date UpdateTime = new Date();
+    public Date UpdateTime = null;
 
 }

@@ -39,6 +39,7 @@ import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.TimeZone;
 import java.util.concurrent.Semaphore;
 
@@ -180,7 +181,7 @@ public class Control {
                             cm.Name = m.Name;
                             for (ModuleParameter p : m.Properties) {
                                 ModuleParameter cp = cm.getParameter(p.Name);
-                                if (cp == null || !cp.UpdateTime.equals(p.UpdateTime))
+                                if (cp == null || cp.UpdateTime == null || !cp.UpdateTime.equals(p.UpdateTime))
                                     cm.setParameter(p.Name, p.Value, p.UpdateTime);
                             }
                         } else {
@@ -478,7 +479,11 @@ public class Control {
                         JSONObject jg = (JSONObject) jGroups.get(g);
                         Group group = new Group();
                         group.Name = jg.getString("Name");
-                        group.Wallpaper = jg.getString("Wallpaper");
+                        // "Wallpaper" field existence check is for backward compatibility with older hg server
+                        if (jg.has("Wallpaper"))
+                            group.Wallpaper = jg.getString("Wallpaper");
+                        else
+                            group.Wallpaper = "";
                         JSONArray jgmodules = jg.getJSONArray("Modules");
                         for (int m = 0; m < jgmodules.length(); m++) {
                             JSONObject jmp = (JSONObject) jgmodules.get(m);
@@ -555,7 +560,7 @@ public class Control {
                         module.Description = jm.getString("Description");
                         module.RoutingNode = jm.getString("RoutingNode");
                         //
-                        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S'Z'");
                         dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
                         //
                         JSONArray jmProperties = jm.getJSONArray("Properties");
@@ -564,8 +569,11 @@ public class Control {
                             ModuleParameter param = new ModuleParameter(jmp.getString("Name"), jmp.getString("Value"));
                             param.Description = jmp.getString("Description");
                             try {
-                                param.UpdateTime = dateFormat.parse(jmp.getString("UpdateTime"));
+                                param.UpdateTime = dateFormat.parse(jmp.getString("UpdateTime").replace("T", " "));
                             } catch (Exception e) {
+                                e.printStackTrace();
+                                if (param.UpdateTime == null)
+                                    param.UpdateTime = new Date();
                             }
                             module.Properties.add(param);
                         }
