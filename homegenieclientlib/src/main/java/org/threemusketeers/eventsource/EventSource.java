@@ -60,6 +60,8 @@ public class EventSource {
     private EventSourceClientHandler handler;
     private ChannelFuture channelFuture;
 
+    private boolean useSsl, sslAcceptAll;
+
     public EventSource(String url,String user, String password, EventLoopGroup group, EventSourceNotification notification, boolean disableAutoReconnect) {
         //System.out.println("[EventSource] constructor start");
         this.group = group;
@@ -73,6 +75,14 @@ public class EventSource {
         handler = new EventSourceClientHandler(uri, user, password, notification, this, disableAutoReconnect);
         channelFuture = createBootstrap();
         //System.out.println("[EventSource] constructor end");
+    }
+
+    public void setSsl(boolean enable) {
+        useSsl = enable;
+    }
+    public void setSsl(boolean enable, boolean acceptAllCertificates) {
+        useSsl = enable;
+        sslAcceptAll = acceptAllCertificates;
     }
 
     public void close() {
@@ -123,9 +133,9 @@ public class EventSource {
                     public void initChannel(SocketChannel ch) throws Exception {
                         ChannelPipeline p = ch.pipeline();
 
-                        if (Control.getSSL()) {
+                        if (useSsl) {
                             SSLContext sslContext = SSLContext.getInstance("TLS");
-                            if (Control.getAcceptAll()) {
+                            if (sslAcceptAll) {
                                 sslContext.init(null, new TrustManager[]{new BogusTrustManager()}, null);
                             } else {
                                 TrustManagerFactory tmFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());

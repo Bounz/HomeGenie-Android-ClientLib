@@ -30,6 +30,7 @@ import com.glabs.homegenie.client.data.Module;
 import com.glabs.homegenie.client.data.ModuleParameter;
 import com.glabs.homegenie.client.eventsource.EventSourceListener;
 import com.glabs.homegenie.client.eventsource.EventSourceTask;
+import com.glabs.homegenie.client.eventsource.EventSourceTaskListener;
 import com.glabs.homegenie.client.httprequest.HttpRequest;
 import com.glabs.homegenie.client.httprequest.HttpRequest.HttpRequestException;
 
@@ -41,9 +42,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.TimeZone;
-import java.util.concurrent.Semaphore;
 
-public class Control {
+public class Control implements EventSourceTaskListener {
 
     public interface ApiRequestCallback {
         void onRequestSuccess(ApiRequestResult result);
@@ -73,50 +73,50 @@ public class Control {
     }
 
 
-    private static String _hg_address;
-    private static String _hg_user;
-    private static String _hg_pass;
-    private static boolean _hg_ssl;
-    private static boolean _hg_acceptAll;
+    private String _hg_address;
+    private String _hg_user;
+    private String _hg_pass;
+    private boolean _hg_ssl;
+    private boolean _hg_ssl_acceptAll;
 
-    private static String _protocol = "http://";
-    private static int _requestTimeout = 15000;
+    private String _protocol = "http://";
+    private int _requestTimeout = 15000;
 
-    private static ArrayList<Module> _modules;
-    private static ArrayList<Group> _groups;
+    private ArrayList<Module> _modules;
+    private ArrayList<Group> _groups;
 
-    private static EventSourceListener _listener;
-    private static EventSourceTask _sseTask;
-    private static boolean _isPaused;
-    //private static Semaphore _connectSemaphore = new Semaphore(1, true);
-    private static boolean _disableAutoreconnect;
+    private EventSourceListener _listener;
+    private EventSourceTask _sseTask;
+    private boolean _isPaused;
+    //private Semaphore _connectSemaphore = new Semaphore(1, true);
+    private boolean _disableAutoreconnect;
 
     public static boolean enableDebug = false;
 
-    public static void setServer(String ip, String user, String pass, boolean ssl, boolean acceptAll) {
+    public void setServer(String ip, String user, String pass, boolean ssl, boolean acceptAll) {
         _hg_address = ip;
         _hg_user = user;
         _hg_pass = pass;
         _hg_ssl = ssl;
-        _hg_acceptAll = acceptAll;
+        _hg_ssl_acceptAll = acceptAll;
         if (_hg_ssl)
             _protocol = "https://";
         else
             _protocol = "http://";
     }
 
-    public static void setServerEventsListener(EventSourceListener listener) {
+    public void setServerEventsListener(EventSourceListener listener) {
         _listener = listener;
     }
 
-    public static void setTimeout(int millis) {
+    public void setTimeout(int millis) {
         _requestTimeout = millis;
     }
-    public static void setDisableAutoreconnect(boolean disable) {
+    public void setDisableAutoreconnect(boolean disable) {
         _disableAutoreconnect = disable;
     }
 
-    public static void connect(final DataUpdatedCallback callback) throws InterruptedException {
+    public void connect(final DataUpdatedCallback callback) throws InterruptedException {
         disconnect();
         debug("[Control] connect() begin");
         //debug("[Control] connect() waiting semaphore");
@@ -127,7 +127,7 @@ public class Control {
             public void onRequestSuccess() {
                 debug("[Control] connect() onRequestSuccess");
                 if (!_isPaused)
-                    _sseTask = new EventSourceTask(getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/", _disableAutoreconnect);
+                    _sseTask = new EventSourceTask(Control.this, getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/", _disableAutoreconnect);
                 //_connectSemaphore.release();
                 //debug("[Control] connect() semaphore released");
                 callback.onRequestSuccess();
@@ -144,7 +144,7 @@ public class Control {
         debug("[Control] connect() end");
     }
 
-    public static void connect(final DataUpdatedCallback callback, EventSourceListener listener) throws InterruptedException {
+    public void connect(final DataUpdatedCallback callback, EventSourceListener listener) throws InterruptedException {
         connect(new DataUpdatedCallback() {
             @Override
             public void onRequestSuccess() {
@@ -159,7 +159,7 @@ public class Control {
         _listener = listener;
     }
 
-    public static void resume(final DataUpdatedCallback callback) throws InterruptedException {
+    public void resume(final DataUpdatedCallback callback) throws InterruptedException {
         debug("[Control] resume() begin");
         pause();
         _isPaused = false;
@@ -167,7 +167,7 @@ public class Control {
         //_connectSemaphore.acquire();
         //debug("[Control] resume() semaphore acquired");
         debug("[Control] resume() getGroupModules");
-        Control.getGroupModules("", new GroupModulesRequestCallback() {
+        getGroupModules("", new GroupModulesRequestCallback() {
             @Override
             public void onRequestSuccess(ArrayList<Module> modules) {
                 debug("[Control] resume() getGroupModules -> onRequestSuccess");
@@ -190,7 +190,7 @@ public class Control {
                     }
                 }
                 if (!_isPaused)
-                    _sseTask = new EventSourceTask(getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/", _disableAutoreconnect);
+                    _sseTask = new EventSourceTask(Control.this, getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Logging/RealTime.EventStream/", _disableAutoreconnect);
                 //_connectSemaphore.release();
                 //debug("[Control] resume() getGroupModules semaphore released");
                 callback.onRequestSuccess();
@@ -207,7 +207,7 @@ public class Control {
         debug("[Control] resume() end");
     }
 
-    public static void pause() throws InterruptedException {
+    public void pause() throws InterruptedException {
         _isPaused = true;
         debug("[Control] pause() begin");
         if (_sseTask != null) {
@@ -218,7 +218,7 @@ public class Control {
         debug("[Control] pause() end");
     }
     
-    public static void disconnect() throws InterruptedException {
+    public void disconnect() throws InterruptedException {
         debug("[Control] disconnect() begin");
         //debug("[Control] disconnect() waiting semaphore");
         //_connectSemaphore.acquire();
@@ -242,39 +242,39 @@ public class Control {
         debug("[Control] disconnect() end");
     }
 
-    public static String getAuthUser() {
+    public String getAuthUser() {
         return _hg_user;
     }
 
-    public static String getAuthPassword() {
+    public String getAuthPassword() {
         return _hg_pass;
     }
 
-    public static boolean getSSL() {
+    public boolean getSsl() {
         return _hg_ssl;
     }
 
-    public static boolean getAcceptAll() {
-        return _hg_acceptAll;
+    public boolean getSslAcceptAll() {
+        return _hg_ssl_acceptAll;
     }
 
-    public static String getHgBaseHttpAddress() {
+    public String getHgBaseHttpAddress() {
         return _protocol + _hg_address + "/";
     }
 
-    public static ArrayList<Module> getModules() {
+    public ArrayList<Module> getModules() {
         return _modules;
     }
 
-    public static ArrayList<Group> getGroups() {
+    public ArrayList<Group> getGroups() {
         return _groups;
     }
 
-    public static Module getModule(String domain, String address) {
+    public Module getModule(String domain, String address) {
         return getModule(_modules, domain, address);
     }
 
-    public static Module getModule(ArrayList<Module> modules, String domain, String address) {
+    public Module getModule(ArrayList<Module> modules, String domain, String address) {
         Module module = null;
         if (modules != null)
         for(Module m : modules) {
@@ -286,9 +286,9 @@ public class Control {
         return module;
     }
     
-    public static void updateData(final DataUpdatedCallback callback) {
+    public void updateData(final DataUpdatedCallback callback) {
         // get complete list of modules
-        Control.getGroupModules("", new GroupModulesRequestCallback() {
+        getGroupModules("", new GroupModulesRequestCallback() {
             @Override
             public void onRequestSuccess(ArrayList<Module> modules) {
                 _modules = modules;
@@ -313,8 +313,8 @@ public class Control {
         });
     }
 
-    public static void updateGroups(final GroupsRequestCallback callback) {
-        Control.getGroups(new GroupsRequestCallback() {
+    public void updateGroups(final GroupsRequestCallback callback) {
+        getGroups(new GroupsRequestCallback() {
             @Override
             public void onRequestSuccess(ArrayList<Group> groups) {
                 if (groups.size() > 0) {
@@ -357,20 +357,47 @@ public class Control {
         });
     }
 
-    public static void getGroups(GroupsRequestCallback callback) {
+    public void getGroups(GroupsRequestCallback callback) {
         new GetGroupsRequest(callback).execute();
     }
 
-    public static void getGroupModules(String group, GroupModulesRequestCallback callback) {
+    public void getGroupModules(String group, GroupModulesRequestCallback callback) {
         new GetGroupModulesRequest(group, callback).execute();
 
     }
 
-    public static void apiRequest(String servicecall, ApiRequestCallback callback) {
-        new ApiRequest(servicecall, callback).execute();
+    /**
+     * Make asynchronous API request.
+     * @param requestUrl API request URL
+     * @param callback Callback handler
+     * @return Reference to AsyncTask object holding this asynchronous task
+     */
+    public AsyncTask apiRequest(String requestUrl, ApiRequestCallback callback) {
+        return (new ApiRequest(requestUrl, callback)).execute();
     }
 
-    public static HttpRequest getHttpGetRequest(String url) {
+    /**
+     * Make synchronous API request.
+     * @param requestUrl API request URL
+     * @return ApiRequestResult object
+     */
+    public ApiRequestResult apiRequest(String requestUrl) {
+        ApiRequestResult result = new ApiRequestResult();
+        //execute the request
+        try {
+            HttpRequest request = getHttpGetRequest(requestUrl);
+            result.ResponseBody = request.body();
+            result.StatusCode = request.code();
+            result.Success = (request.code() < 400);
+        } catch (HttpRequestException e) {
+            //Log.e("AsyncOperationFailed", e.getMessage());
+            result.ResponseBody = e.getMessage();
+            e.printStackTrace();
+        }
+        return result;
+    }
+
+    public HttpRequest getHttpGetRequest(String url) {
         HttpRequest request = HttpRequest.get(url);
         // Set the timeout in milliseconds until a connection is established.
         // The default value is zero, that means the timeout is not used.
@@ -382,7 +409,7 @@ public class Control {
         request.readTimeout(timeoutSocket);
         if (!_hg_user.equals("") && !_hg_pass.equals(""))
             request.basic(_hg_user, _hg_pass);
-        if (_hg_acceptAll && _hg_ssl) {
+        if (_hg_ssl_acceptAll && _hg_ssl) {
             request.trustAllCerts();
             request.trustAllHosts();
         }
@@ -390,7 +417,7 @@ public class Control {
     }
 
     // TODO: move this to the Utility class
-    public static String getUpnpDisplayName(Module m) {
+    public String getUpnpDisplayName(Module m) {
         String desc = m.getDisplayAddress();
         if (m.getParameter("UPnP.ModelDescription") != null && !m.getParameter("UPnP.ModelDescription").Value.trim().equals("")) {
             desc = m.getParameter("UPnP.ModelDescription").Value;
@@ -400,33 +427,20 @@ public class Control {
         return desc;
     }
 
-    public static class ApiRequest extends AsyncTask<String, Boolean, ApiRequestResult> {
+    public class ApiRequest extends AsyncTask<String, Boolean, ApiRequestResult> {
 
         private String serviceUrl;
         //
         private ApiRequestCallback callback;
 
         public ApiRequest(String servicecall, ApiRequestCallback callback) {
-            this.serviceUrl = _protocol + _hg_address + "/api/" + servicecall;
+            this.serviceUrl = getHgBaseHttpAddress() + "api/" + servicecall;
             this.callback = callback;
         }
 
         @Override
         protected ApiRequestResult doInBackground(String... params) {
-            ApiRequestResult result = new ApiRequestResult();
-            //execute the request
-            try {
-                HttpRequest request = getHttpGetRequest(serviceUrl);
-                result.ResponseBody = request.body();
-                result.StatusCode = request.code();
-                result.Success = (request.code() < 400);
-                return result;
-            } catch (HttpRequestException e) {
-                //Log.e("AsyncOperationFailed", e.getMessage());
-                result.ResponseBody = e.getMessage();
-                e.printStackTrace();
-            }
-            return result;
+            return apiRequest(serviceUrl);
         }
 
         protected void onPostExecute(ApiRequestResult result) {
@@ -439,33 +453,20 @@ public class Control {
         }
     }
 
-    public static class GetGroupsRequest extends AsyncTask<String, Boolean, ApiRequestResult> {
+    public class GetGroupsRequest extends AsyncTask<String, Boolean, ApiRequestResult> {
 
         private String serviceUrl;
         //
         private GroupsRequestCallback callback;
 
         public GetGroupsRequest(GroupsRequestCallback callback) {
-            this.serviceUrl = _protocol + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Groups.List/";
+            this.serviceUrl = getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Config/Groups.List/";
             this.callback = callback;
         }
 
         @Override
         protected ApiRequestResult doInBackground(String... params) {
-            ApiRequestResult result = new ApiRequestResult();
-            //execute the request
-            try {
-                HttpRequest request = getHttpGetRequest(serviceUrl);
-                result.ResponseBody = request.body();
-                result.StatusCode = request.code();
-                result.Success = (request.code() < 400);
-                return result;
-            } catch (HttpRequestException e) {
-                //Log.e("AsyncOperationFailed", e.getMessage());
-                result.ResponseBody = e.getMessage();
-                e.printStackTrace();
-            }
-            return result;
+            return apiRequest(serviceUrl);
         }
 
         protected void onPostExecute(ApiRequestResult result) {
@@ -508,7 +509,7 @@ public class Control {
     }
 
 
-    public static class GetGroupModulesRequest extends AsyncTask<String, Boolean, ApiRequestResult> {
+    public class GetGroupModulesRequest extends AsyncTask<String, Boolean, ApiRequestResult> {
 
         private String serviceUrl;
         //
@@ -516,29 +517,16 @@ public class Control {
 
         public GetGroupModulesRequest(String groupName, GroupModulesRequestCallback callback) {
             if (groupName.equals("")) {
-                this.serviceUrl = _protocol + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Modules.List/";
+                this.serviceUrl = getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Config/Modules.List/";
             } else {
-                this.serviceUrl = _protocol + _hg_address + "/api/HomeAutomation.HomeGenie/Config/Groups.ModulesList/" + Uri.encode(groupName);
+                this.serviceUrl = getHgBaseHttpAddress() + "api/HomeAutomation.HomeGenie/Config/Groups.ModulesList/" + Uri.encode(groupName);
             }
             this.callback = callback;
         }
 
         @Override
         protected ApiRequestResult doInBackground(String... params) {
-            ApiRequestResult result = new ApiRequestResult();
-            //execute the request
-            try {
-                HttpRequest request = getHttpGetRequest(serviceUrl);
-                result.ResponseBody = request.body();
-                result.StatusCode = request.code();
-                result.Success = (request.code() < 400);
-                return result;
-            } catch (HttpRequestException e) {
-                //Log.e("AsyncOperationFailed", e.getMessage());
-                result.ResponseBody = e.getMessage();
-                e.printStackTrace();
-            }
-            return result;
+            return apiRequest(serviceUrl);
         }
 
         protected void onPostExecute(ApiRequestResult result) {
@@ -597,13 +585,13 @@ public class Control {
     //
     // Server Sent Events Handling
     //
-    public static void onSseConnect() {
+    public void onSseConnect() {
         if (_listener != null) {
             _listener.onSseConnect();
         }
     }
 
-    public static void onSseEvent(Event event) {
+    public void onSseEvent(Event event) {
 
         Module module = getModule(event.Domain, event.Source);
         if (module != null) {
@@ -615,7 +603,7 @@ public class Control {
         }
     }
 
-    public static void onSseError(String error) {
+    public void onSseError(String error) {
         if (_listener != null) {
             _listener.onSseError(error);
         }

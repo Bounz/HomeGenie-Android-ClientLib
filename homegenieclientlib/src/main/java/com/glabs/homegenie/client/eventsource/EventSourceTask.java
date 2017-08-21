@@ -44,10 +44,13 @@ import io.netty.channel.nio.NioEventLoopGroup;
 public class EventSourceTask implements EventSourceNotification {
 
     private EventSource eventSource;
+    private EventSourceTaskListener listener;
 
-    public EventSourceTask(String url, boolean disableAutoReconnect)
+    public EventSourceTask(EventSourceTaskListener listener, String url, boolean disableAutoReconnect)
     {
-        eventSource = new EventSource(url, Control.getAuthUser(), Control.getAuthPassword(), new NioEventLoopGroup(), this, disableAutoReconnect);
+        this.listener = listener;
+        eventSource = new EventSource(url, listener.getAuthUser(), listener.getAuthPassword(), new NioEventLoopGroup(), this, disableAutoReconnect);
+        eventSource.setSsl(listener.getSsl(), listener.getSslAcceptAll());
     }
 
     public void stop()
@@ -65,7 +68,7 @@ public class EventSourceTask implements EventSourceNotification {
 
     @Override
     public void onOpen() {
-        Control.onSseConnect();
+        listener.onSseConnect();
     }
 
     @Override
@@ -82,7 +85,7 @@ public class EventSourceTask implements EventSourceNotification {
             event.Description = jevent.getString("Description");
             event.Property = jevent.getString("Property");
             event.Value = jevent.getString("Value");
-            Control.onSseEvent(event);
+            listener.onSseEvent(event);
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -90,6 +93,6 @@ public class EventSourceTask implements EventSourceNotification {
 
     @Override
     public void onError(String error) {
-        Control.onSseError(error);
+        listener.onSseError(error);
     }
 }

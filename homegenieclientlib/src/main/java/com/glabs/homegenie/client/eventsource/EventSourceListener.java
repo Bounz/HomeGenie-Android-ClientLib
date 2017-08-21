@@ -32,3 +32,4 @@ public interface EventSourceListener {
     void onSseEvent(Module module, Event event);
     void onSseError(String error);
 }
+

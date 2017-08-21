@@ -21,10 +21,13 @@
 
 package com.glabs.homegenie.client.data;
 
+import android.os.AsyncTask;
+
 import java.util.Observable;
 
 import com.glabs.homegenie.client.Control;
 import com.glabs.homegenie.client.Utility;
+import com.glabs.homegenie.client.httprequest.HttpRequest;
 
 import java.io.Serializable;
 import java.text.DecimalFormat;
@@ -145,22 +148,6 @@ public class Module extends Observable implements Serializable {
         }
         setChanged();
         notifyObservers(mp);
-    }
-
-    public void control(String apicommand, final Control.ApiRequestCallback callback) {
-        Control.apiRequest(this.Domain + "/" + this.Address + "/" + apicommand, new Control.ApiRequestCallback() {
-            @Override
-            public void onRequestSuccess(Control.ApiRequestResult result) {
-                if (callback != null)
-                    callback.onRequestSuccess(result);
-            }
-
-            @Override
-            public void onRequestError(Control.ApiRequestResult result) {
-                if (callback != null)
-                    callback.onRequestError(result);
-            }
-        });
     }
 
 }
